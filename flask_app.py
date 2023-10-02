@@ -15,6 +15,7 @@ class Stats():
     train : list
     valid : list
     test : list
+    message : str
 
 
 def GetUserStats() -> {}:
@@ -34,7 +35,7 @@ def GetUserStats() -> {}:
         user_name = os.path.splitext(os.path.basename(file_path))[0]
         stats[user_name] = []
         
-        with open(file_path, "r") as csv_file:    
+        with open(file_path, "r", encoding='shift_jis') as csv_file:    
             line = csv_file.readline() # ヘッダ読み飛ばし
             while True:
                 line = csv_file.readline()
@@ -50,6 +51,7 @@ def GetUserStats() -> {}:
                     train = TransIntIntFloat(raw[3:6])
                     valid = TransIntIntFloat(raw[6:9])
                     test = TransIntIntFloat(raw[9:12])
+                    message = raw[12]
 
                     # すべて読めたら保持
                     stats_read.username = user_name
@@ -58,14 +60,16 @@ def GetUserStats() -> {}:
                     stats_read.train = train
                     stats_read.valid = valid
                     stats_read.test = test
+                    stats_read.message = message
                     stats[user_name].append(stats_read)
                 except Exception as e:
                     print(e)
     return stats
 
+
 #Flaskオブジェクトの生成
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限5MB
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 2MB
 
 @app.route('/')
 def index():
@@ -93,9 +97,9 @@ def board():
             html_user += f'<tr>'
             html_user += f'<td>{stats.username}</td>'
             html_user += f'<td>{stats.datetime}</td>'
-            html_user += f'<td>{stats.train[2] * 100  if (stats.train[0] + stats.train[1] > 0) else "-"} %</td>'
-            html_user += f'<td>{stats.valid[2] * 100 if (stats.valid[0] + stats.valid[1] > 0) else "-"} %</td>'
-            html_user += f'<td>{stats.test[2] * 100 if (stats.test[0] + stats.test[1] > 0) else "-"} %</td>'
+            html_user += f'<td>{stats.train[2] * 100  if (stats.train[0] + stats.train[1] > 0) else "-":.2f} %</td>'
+            html_user += f'<td>{stats.valid[2] * 100 if (stats.valid[0] + stats.valid[1] > 0) else "-":.2f} %</td>'
+            html_user += f'<td>{stats.test[2] * 100 if (stats.test[0] + stats.test[1] > 0) else "-":.2f} %</td>'
             html_user += f'</tr>'
 
             html += html_user
@@ -120,7 +124,7 @@ def log():
 
     html = ""
     html += "<table>"
-    html += "<tr><th>参加者</th><th>登録日時</th><th>train(配布)データ正解率</th><th>validデータ正解率</th><th>testデータ正解率</th></tr>"
+    html += "<tr><th>参加者</th><th>登録日時</th><th>train(配布)データ正解率</th><th>validデータ正解率</th><th>testデータ正解率</th><th>メッセージ</th></tr>"
 
     for stats in sorted_stats_list:
         html_user = ""
@@ -128,9 +132,10 @@ def log():
             html_user += f'<tr>'
             html_user += f'<td>{stats.username}</td>'
             html_user += f'<td>{stats.datetime}</td>'
-            html_user += f'<td>{stats.train[2] * 100  if (stats.train[0] + stats.train[1] > 0) else "-"} %</td>'
-            html_user += f'<td>{stats.valid[2] * 100 if (stats.valid[0] + stats.valid[1] > 0) else "-"} %</td>'
-            html_user += f'<td>{stats.test[2] * 100 if (stats.test[0] + stats.test[1] > 0) else "-"} %</td>'
+            html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>-</td>'
+            html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>-</td>'
+            html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>-</td>'
+            html_user += f'<td>{stats.message}</td>'
             html_user += f'</tr>'
         except:
             continue
@@ -149,13 +154,25 @@ def upload_file():
     if request.method == 'POST':
         try:
             file = request.files['file']
-            file.save(os.path.join(UPLOAD_DIR_ROOT, secure_filename(file.filename)))
-            msg = f'{file.filename}がアップロードされました。'
+            user = request.form['user']
+            save_dir = os.path.join(UPLOAD_DIR_ROOT, user)
+            if os.path.exists(save_dir):
+                file.save(os.path.join(save_dir, secure_filename(file.filename)))
+                msg = f'{file.filename}がアップロードされました。'
+            else:
+                raise(ValueError("アップロード先のディレクトリが存在しません。"))
         except:
             msg = "アップロードに失敗しました。"
 
-    return render_template('upload.html', message=msg)
+    user_name_list = []
+    dir_list = glob.glob(os.path.join(UPLOAD_DIR_ROOT, "**/"))
+    for dir in dir_list:
+        # ディレクトリ名を取得→ユーザ名として使う
+        user_name = os.path.basename(os.path.dirname(dir))
+        user_name_list.append(user_name)
+
+    return render_template('upload.html', message=msg, username=user_name_list)
   
 
 if __name__ == "__main__":
-    app.run(debug=False, host='0.0.0.0', port=8080)
+    app.run(debug=False, host='0.0.0.0', port=5000)

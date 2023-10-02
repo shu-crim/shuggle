@@ -58,7 +58,7 @@ def main():
     print("correct_list", correct_list)
     print("answer_list", answer_list)
     print("evaluate", evaluate)
-    print(f"accuracy: {np.sum(evaluate)/num_test*100}% ({np.sum(evaluate)} / {num_test})")
+    print(f"accuracy: {np.sum(evaluate)/num_test*100:.2f}% ({np.sum(evaluate)} / {num_test})")
     
 
 if __name__ == "__main__":

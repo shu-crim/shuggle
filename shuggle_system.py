@@ -150,7 +150,7 @@ def main():
             # ディレクトリ名を取得→ユーザ名として使う
             user_name = os.path.basename(os.path.dirname(dir))
 
-            # そのディレクトリ内の.pyファイルの一覧を作成して走査
+            # そのディレクトリ内の.pyファイルの一覧を作成して走査：1ユーザあたり1ループで1ファイル
             py_files = glob.glob(os.path.join(UPLOAD_DIR, user_name, "*.py"))
             for path in py_files:
                 # ファイル移動を試みる

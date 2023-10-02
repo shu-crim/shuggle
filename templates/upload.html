@@ -1,5 +1,13 @@
 <h1>.pyファイルのアップロード</h1>
 <form action="" method="POST" enctype="multipart/form-data">
+    1. ユーザ名を選択してください（匿名希望の方はanonymousを選択）：<br>
+    <select name="user">
+        {% for username in username %}
+            <option value="{{ username }}">{{ username }}</option>
+        {% endfor %}
+    </select>
+    <br><br>
+    2. アップロードする.pyファイルを選択してアップロードボタンをクリックしてください：<br>
     <input type="file" name="file">
     <input type="submit" value="アップロード">
 </form>
