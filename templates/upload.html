@@ -3,7 +3,11 @@
     1. ユーザ名を選択してください（匿名希望の方はanonymousを選択）：<br>
     <select name="user">
         {% for username in username %}
-            <option value="{{ username }}">{{ username }}</option>
+            {% if selected_user == username  %}
+                <option value="{{ username }}" selected>{{ username }}</option>
+            {% else %}
+                <option value="{{ username }}">{{ username }}</option>
+            {% endif %}
         {% endfor %}
     </select>
     <br><br>
