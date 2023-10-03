@@ -20,6 +20,7 @@ INPUT_DATA_TRAIN_DIR = r"./input_data/train"
 INPUT_DATA_VALID_DIR = r"./input_data/valid" 
 INPUT_DATA_TEST_DIR = r"./input_data/test"
 CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
+PROC_TIMEOUT_SEC = 1
 
 def read_dataset(path_csv):
     with open(path_csv, "r") as csv_file:
@@ -56,23 +57,35 @@ def evaluate(path_csv, func_recognition):
     # 正解データ数
     num_test = len(input_data_list)
 
+    total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
         answer_list = np.zeros((num_test), int)
-        for i in range(num_test):
-            with Pool(processes=1) as p:
+        with Pool(processes=1) as p:
+            for i in range(num_test):
+                time_limit = PROC_TIMEOUT_SEC * 20 if i == 0 else PROC_TIMEOUT_SEC # 初回のみオーバーヘッドを考慮してゆるめ
+
+                start_time = time.time()
                 apply_result = p.apply_async(func_recognition, (input_data_list[i],))
-                answer = apply_result.get(timeout=10) # 10秒でタイムアウト
+                answer = apply_result.get(timeout=time_limit)
 
-            if type(answer) is not int:
-                raise(ValueError("推定処理の返り値がint型ではありません。"))
-            answer_list[i] = answer
+                if type(answer) is not int:
+                    raise(ValueError("推定処理の返り値がint型ではありません。"))
+                
+                end_time = time.time()
+                total_proc_time += end_time - start_time
+                #print(f'proc time: {end_time - start_time} s')
+                if end_time - start_time > time_limit:
+                    raise(TimeoutError("推定処理がタイムアウトしました。"))
 
-            # answer_list[i] = func_recognition(input_data_list[i]) #単純な実行
+                answer_list[i] = answer
     except TimeoutError:
-        raise(ValueError("推定処理がタイムアウトしました。"))
+        print("推定処理がタイムアウトしました。")
+        raise(TimeoutError("推定処理がタイムアウトしました。"))
     except Exception as e:
         raise(e)
+    
+    print(f'average proc time: {total_proc_time / num_test : .1f}s, totla: {total_proc_time : .1f} s')
 
     return num_test, filename_list, correct_list, answer_list
 
@@ -111,6 +124,8 @@ def evaluate3data(module_name):
     
     # 結果のリスト
     result_list = []
+    
+    start = time.time()
 
     try:    
         # train
@@ -138,6 +153,8 @@ def evaluate3data(module_name):
             result_list.append(result)
     except Exception as e:
         raise(e)
+
+    print(f'Proc Time: {time.time()-start} s')
 
     return result_list
 
