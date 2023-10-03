@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, make_response
 from werkzeug.utils import secure_filename
+import json
 
 import os
 import glob
@@ -7,6 +8,7 @@ import datetime
 
 USER_RESULT_DIR = r"./output/user"
 UPLOAD_DIR_ROOT = r"./upload_dir"
+ALLOWED_EXTENSIONS = set(['py'])
 
 class Stats():
     username : str
@@ -146,24 +148,43 @@ def log():
 
     return html
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     msg = ""
+    cookie_write = False
 
     if request.method == 'POST':
-        try:
-            file = request.files['file']
-            user = request.form['user']
-            save_dir = os.path.join(UPLOAD_DIR_ROOT, user)
-            if os.path.exists(save_dir):
-                file.save(os.path.join(save_dir, secure_filename(file.filename)))
-                msg = f'{file.filename}がアップロードされました。'
-            else:
-                raise(ValueError("アップロード先のディレクトリが存在しません。"))
-        except:
-            msg = "アップロードに失敗しました。"
+        file = request.files['file']
+        user = request.form['user']
+        cookie_write = True
+        if not file:
+            msg = "ファイルが選択されていません。"
+        elif not allowed_file(file.filename):
+            msg = "アップロードできるファイルは.pyのみです。"
+        else:
+            try:
+                user = request.form['user']
+                save_dir = os.path.join(UPLOAD_DIR_ROOT, user)
+                if os.path.exists(save_dir):
+                    file.save(os.path.join(save_dir, secure_filename(file.filename)))
+                    msg = f'{file.filename}がアップロードされました。'
+                else:
+                    raise(ValueError("アップロード先のディレクトリが存在しません。"))
+            except:
+                msg = "アップロードに失敗しました。"
 
+
+    if not cookie_write:
+        # 既存のクッキーから過去の選択を読み出し
+        user_info = request.cookies.get('user_info')
+        if user_info is not None:
+            user_info = json.loads(user_info)
+            user = user_info['name']
+
+    # ディレクトリ名からユーザ名のlistを作成
     user_name_list = []
     dir_list = glob.glob(os.path.join(UPLOAD_DIR_ROOT, "**/"))
     for dir in dir_list:
@@ -171,7 +192,15 @@ def upload_file():
         user_name = os.path.basename(os.path.dirname(dir))
         user_name_list.append(user_name)
 
-    return render_template('upload.html', message=msg, username=user_name_list)
+    response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user))
+
+    # クッキー書き込み
+    if cookie_write:
+        expires = int(datetime.datetime.now().timestamp()) + 10 * 24 * 3600
+        user_info = {'name': user} 
+        response.set_cookie('user_info', value=json.dumps(user_info), expires=expires)
+
+    return response
   
 
 if __name__ == "__main__":
