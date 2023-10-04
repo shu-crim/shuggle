@@ -14,11 +14,11 @@ ALLOWED_EXTENSIONS = set(['py'])
 class Stats():
     username : str
     datetime : datetime
-    filename : str
-    train : list
-    valid : list
-    test : list
-    message : str
+    filename : str = ""
+    train : list = [0, 0, 0.0]
+    valid : list = [0, 0, 0.0]
+    test : list = [0, 0, 0.0]
+    message : str = ""
 
 
 def GetUserStats() -> {}:
@@ -56,7 +56,7 @@ def GetUserStats() -> {}:
                     test = TransIntIntFloat(raw[9:12])
                     message = raw[12]
 
-                    # すべて読めたら保持
+                    # すべて読めたので保持
                     stats_read.username = user_name
                     stats_read.datetime = dt
                     stats_read.filename = filename
@@ -67,6 +67,11 @@ def GetUserStats() -> {}:
                     stats[user_name].append(stats_read)
                 except Exception as e:
                     print(e)
+
+        # ひとつも読めなかった場合はキーを削除
+        if len(stats[user_name]) == 0:
+            stats.pop(user_name)
+
     return stats
 
 class Page(Enum):
@@ -85,7 +90,7 @@ def menuHTML(page):
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link{0} href="/board">結果一覧</a>
+                            <a class="nav-link{0} href="/board">評価結果一覧</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link{1} href="/log">履歴</a>
@@ -105,6 +110,41 @@ def menuHTML(page):
     )
 
     return Markup(html)
+
+
+def CreateTableRow(stats, test = False, message = False):
+    html_user = ""
+    html_user += f'<tr>'
+    html_user += f'<td>{stats.username}</td>'
+    html_user += f'<td>{stats.datetime}</td>'
+    html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>-</td>'
+    html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>-</td>'
+    if test:
+        html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>-</td>'
+    if message:
+        html_user += f'<td>{stats.message}</td>'
+    html_user += f'</tr>'
+    return html_user
+
+
+def CreateTable(stats_list, test = False, message = False):
+    html_table = ""
+    html_table += "<table class=\"table table-dark\">"
+    html_table += "<thead><tr><th>参加者</th><th>提出日時</th><th>train(配布)正解率</th><th>valid正解率</th>"
+    if test:
+        html_table += "<th>test正解率</th>"
+    if message:
+        html_table += "<th>メッセージ</th>"
+    html_table += "</tr></thead>"
+    html_table += "<tbody>"
+
+    for stats in stats_list:
+        html_table += CreateTableRow(stats, test=test, message=message)
+
+    html_table += "</tbody>"
+    html_table += "</table>"
+
+    return html_table
 
 #Flaskオブジェクトの生成
 app = Flask(__name__)
@@ -126,28 +166,8 @@ def board():
         latest_stats_list.append(stats[-1])
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
-    html_table = ""
-    html_table += "<table class=\"table table-dark\">"
-    html_table += "<thead><tr><th>参加者</th><th>最終提出日時</th><th>train(配布)正解率</th><th>valid正解率</th><th>test正解率</th></tr></thead>"
-    html_table += "<tbody>"
-
-    for stats in sorted_stats_list:
-        try:
-            html_user = ""
-            html_user += f'<tr>'
-            html_user += f'<td>{stats.username}</td>'
-            html_user += f'<td>{stats.datetime}</td>'
-            html_user += f'<td>{stats.train[2] * 100  if (stats.train[0] + stats.train[1] > 0) else "-":.2f} %</td>'
-            html_user += f'<td>{stats.valid[2] * 100 if (stats.valid[0] + stats.valid[1] > 0) else "-":.2f} %</td>'
-            html_user += f'<td>{stats.test[2] * 100 if (stats.test[0] + stats.test[1] > 0) else "-":.2f} %</td>'
-            html_user += f'</tr>'
-
-            html_table += html_user
-        except:
-            continue
-
-    html_table += "</tbody>"
-    html_table += "</table>"
+    # 表を作成
+    html_table = CreateTable(sorted_stats_list)
 
     return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD))
 
@@ -163,29 +183,8 @@ def log():
             stats_list.append(item)
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
-    html_table = ""
-    html_table += "<table class=\"table table-dark\">"
-    html_table += "<thead><tr><th>参加者</th><th>登録日時</th><th>train(配布)正解率</th><th>valid正解率</th><th>test正解率</th><th>メッセージ</th></tr></thead>"
-    html_table += "<tbody>"
-
-    for stats in sorted_stats_list:
-        html_user = ""
-        try:
-            html_user += f'<tr>'
-            html_user += f'<td>{stats.username}</td>'
-            html_user += f'<td>{stats.datetime}</td>'
-            html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>-</td>'
-            html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>-</td>'
-            html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>-</td>'
-            html_user += f'<td>{stats.message}</td>'
-            html_user += f'</tr>'
-        except:
-            continue
-
-        html_table += html_user
-        
-    html_table += "</tbody>"
-    html_table += "</table>"
+    # 表を作成
+    html_table = CreateTable(sorted_stats_list, message=True)
 
     return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG))
 
