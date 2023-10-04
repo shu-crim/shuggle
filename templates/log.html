@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shuggle</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+    </head>
+    <body>
+        {{menu}}
+
+        <div class="container col-11">
+            <h1>履歴</h1>
+        </div>
+
+        <div class="container col-11">
+            {{table_log}}
+        </div>
+
+        <script src="static/js/bootstrap.js"></script>
+    </body>
+</html>

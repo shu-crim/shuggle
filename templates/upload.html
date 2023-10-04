@@ -1,20 +1,54 @@
-<h1>.pyファイルのアップロード</h1>
-<form action="" method="POST" enctype="multipart/form-data">
-    1. ユーザ名を選択してください（匿名希望の方はanonymousを選択）：<br>
-    <select name="user">
-        {% for username in username %}
-            {% if selected_user == username  %}
-                <option value="{{ username }}" selected>{{ username }}</option>
-            {% else %}
-                <option value="{{ username }}">{{ username }}</option>
-            {% endif %}
-        {% endfor %}
-    </select>
-    <br><br>
-    2. アップロードする.pyファイルを選択してアップロードボタンをクリックしてください：<br>
-    <input type="file" name="file">
-    <input type="submit" value="アップロード">
-</form>
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shuggle</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+    </head>
+    <body>
+        {{menu}}
 
-{{message}}
+        <div class="container col-11">
+            <h1>処理モジュール(*.py)のアップロード</h1>
+        </div>
 
+        <br>
+
+        <div class="container col-11">
+            <form action="" method="POST" enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col-12">
+                        <h5>1. ユーザ名を選択してください（匿名希望の方はanonymousを選択）：</h5>
+                        <select name="user" class="form-control-lg">
+                            {% for username in username %}
+                                {% if selected_user == username  %}
+                                    <option value="{{ username }}" selected>{{ username }}</option>
+                                {% else %}
+                                    <option value="{{ username }}">{{ username }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <br><br>
+                        <h5>2. アップロードする.pyファイルを選択してアップロードボタンをクリックしてください：</h5>
+                        <input type="file" name="file" class="w-100 p-3 form-control-lg"><br>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-8">
+                    </div>
+                    <div class="col-4">
+                        <input type="submit" value="アップロード" class="form-control-lg btn btn-outline-info">
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="container col-11">
+            {{message}}
+        </div>
+
+        <script src="static/js/bootstrap.js"></script>
+    </body>
+</html>

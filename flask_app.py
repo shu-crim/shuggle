@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response
+from flask import Flask, render_template, request, redirect, url_for, make_response, Markup
 from werkzeug.utils import secure_filename
 import json
 
 import os
 import glob
 import datetime
+from enum import Enum
 
 USER_RESULT_DIR = r"./output/user"
 UPLOAD_DIR_ROOT = r"./upload_dir"
@@ -68,6 +69,42 @@ def GetUserStats() -> {}:
                     print(e)
     return stats
 
+class Page(Enum):
+    BOARD = 1,
+    LOG = 2,
+    UPLOAD = 3
+
+def menuHTML(page):
+    html = """
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+            <div class="container-fluid">
+                <a class="navbar-brand">Shuggle</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link{0} href="/board">結果一覧</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link{1} href="/log">履歴</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link{2} href="/upload">提出</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+    """.format(
+        " active\" aria-current=\"page\"" if page == Page.BOARD else "\"",
+        " active\" aria-current=\"page\"" if page == Page.LOG else "\"",
+        " active\" aria-current=\"page\"" if page == Page.UPLOAD else "\""
+    )
+
+    return Markup(html)
 
 #Flaskオブジェクトの生成
 app = Flask(__name__)
@@ -89,9 +126,10 @@ def board():
         latest_stats_list.append(stats[-1])
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
-    html = ""
-    html += "<table>"
-    html += "<tr><th>参加者</th><th>最終登録日時</th><th>train(配布)データ正解率</th><th>validデータ正解率</th><th>testデータ正解率</th></tr>"
+    html_table = ""
+    html_table += "<table class=\"table table-dark\">"
+    html_table += "<thead><tr><th>参加者</th><th>最終提出日時</th><th>train(配布)正解率</th><th>valid正解率</th><th>test正解率</th></tr></thead>"
+    html_table += "<tbody>"
 
     for stats in sorted_stats_list:
         try:
@@ -104,13 +142,14 @@ def board():
             html_user += f'<td>{stats.test[2] * 100 if (stats.test[0] + stats.test[1] > 0) else "-":.2f} %</td>'
             html_user += f'</tr>'
 
-            html += html_user
+            html_table += html_user
         except:
             continue
 
-    html += "</table>"
+    html_table += "</tbody>"
+    html_table += "</table>"
 
-    return html
+    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD))
 
 
 @app.route("/log")
@@ -124,9 +163,10 @@ def log():
             stats_list.append(item)
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
-    html = ""
-    html += "<table>"
-    html += "<tr><th>参加者</th><th>登録日時</th><th>train(配布)データ正解率</th><th>validデータ正解率</th><th>testデータ正解率</th><th>メッセージ</th></tr>"
+    html_table = ""
+    html_table += "<table class=\"table table-dark\">"
+    html_table += "<thead><tr><th>参加者</th><th>登録日時</th><th>train(配布)正解率</th><th>valid正解率</th><th>test正解率</th><th>メッセージ</th></tr></thead>"
+    html_table += "<tbody>"
 
     for stats in sorted_stats_list:
         html_user = ""
@@ -142,14 +182,17 @@ def log():
         except:
             continue
 
-        html += html_user
+        html_table += html_user
         
-    html += "</table>"
+    html_table += "</tbody>"
+    html_table += "</table>"
 
-    return html
+    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG))
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
@@ -183,6 +226,8 @@ def upload_file():
         if user_info is not None:
             user_info = json.loads(user_info)
             user = user_info['name']
+        else:
+            user = 'anonymous'
 
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = []
@@ -192,7 +237,7 @@ def upload_file():
         user_name = os.path.basename(os.path.dirname(dir))
         user_name_list.append(user_name)
 
-    response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user))
+    response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD)))
 
     # クッキー書き込み
     if cookie_write:
