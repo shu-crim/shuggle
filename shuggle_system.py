@@ -180,15 +180,16 @@ def main():
                 
                 # 移動に成功したら評価
                 print(f"{path} -> {new_filename}")
-                success = False
+                move_success = False
+                message = ""
                 try:
                     result_list = evaluate3data(os.path.splitext(new_filename)[0]) # 拡張子を除く
-                    success = True
+                    move_success = True
                 except Exception as e:
-                    success = False
+                    move_success = False
                     message = e                   
 
-                if success:
+                if move_success:
                     # 評価結果を集計
                     num_true = {}
                     num_false = {}
@@ -233,14 +234,13 @@ def main():
                     output_csv_file.write(now.strftime('%Y/%m/%d,%H:%M:%S,'))                    
                     output_csv_file.write(os.path.basename(new_filename) + ",")
                     for data_type in DataType:
-                        if success:
+                        if move_success:
+                            num_data = num_true[data_type] + num_false[data_type]
                             output_csv_file.write(f"{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'},")
                         else:
                             output_csv_file.write(f"-,-,-,")
 
-                    if not success:
-                        output_csv_file.write(f"{message}")
-
+                    output_csv_file.write(f"{message}")
                     output_csv_file.write("\n")
 
         # 少し待つ
