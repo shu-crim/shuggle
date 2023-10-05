@@ -32,19 +32,32 @@
                         </select>
                         <br><br>
                         <h5>2. アップロードする.pyファイルを選択してアップロードボタンをクリックしてください：</h5>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-2 d-flex align-items-end text-right justify-content-end d-flex align-items-center">
+                        ファイル選択
+                    </div>
+                    <div class="col-10">
                         <input type="file" name="file" class="w-100 p-3 form-control-lg"><br>
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-8">
+                    <div class="col-2 d-flex align-items-end text-right justify-content-end d-flex align-items-center">
+                        メモ(20文字まで)<br>公開されます
                     </div>
-                    <div class="col-4">
-                        <input type="submit" value="アップロード" class="form-control-lg btn btn-outline-info">
+                    <div class="col-8">
+                        <input type="text" name="memo" maxlength="20" class="w-100 p-1">
+                    </div>
+                    <div class="col-2">
+                        <input type="submit" value="アップロード" class="w-100 p-2 form-control-lg btn btn-outline-info">
                     </div>
                 </div>
             </form>
         </div>
         
+        <br>
+
         <div class="container col-11">
             {{message}}
         </div>

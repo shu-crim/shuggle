@@ -145,7 +145,7 @@ def evaluate3data(module_name, user_name):
         for i in range(num_valid):
             result = Result(DataType.valid, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
-        print(f'Valud({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
+        print(f'Valiid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
 
         # test
         num_test, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_TEST_DIR, CORRECT_ANSWER_CSV_FILENAME), func_recognition)
@@ -164,10 +164,10 @@ def evaluate3data(module_name, user_name):
     return result_list
 
 
-def ProcOneUser(user_name, new_filename, now):
+def ProcOneUser(user_name, new_filename, now, memo=''):
     # 処理と評価を実行
     proc_success = False
-    message = ""
+    message = ''
     try:
         result_list = evaluate3data(os.path.splitext(new_filename)[0], user_name) # 拡張子を除く
         proc_success = True
@@ -215,9 +215,10 @@ def ProcOneUser(user_name, new_filename, now):
             output_csv_file.write("date,time,filename,")
             for data_type in DataType:
                 output_csv_file.write(f"{data_type.name}_true,{data_type.name}_false,{data_type.name}_accuracy,")
-            output_csv_file.write("message\n")
+            output_csv_file.write("message,memo")
 
     with open(csv_path, "a", encoding='shift_jis') as output_csv_file:
+        output_csv_file.write('\n') # 各結果の最初に改行を入れる。前の不正終了を引きずらないため
         output_csv_file.write(now.strftime('%Y/%m/%d,%H:%M:%S,'))                    
         output_csv_file.write(os.path.basename(new_filename) + ",")
         for data_type in DataType:
@@ -227,8 +228,7 @@ def ProcOneUser(user_name, new_filename, now):
             else:
                 output_csv_file.write(f"-,-,-,")
 
-        output_csv_file.write(f"{message}")
-        output_csv_file.write("\n")
+        output_csv_file.write(f"{message},{memo}")
 
 
 def main():
@@ -256,13 +256,24 @@ def main():
                     shutil.move(path, os.path.join("./", USER_MODULE_DIR_NAME, new_filename))
                 except:
                     continue
+
+                # メモもあれば読み込んで移動
+                memo = ''
+                if os.path.exists(path + '.txt'):
+                    try:
+                        with open(path + '.txt', encoding='utf-8') as f:
+                            memo = f.read()
+
+                        shutil.move(path + '.txt', os.path.join("./", USER_MODULE_DIR_NAME, new_filename + '.txt'))
+                    except Exception as e:
+                        print(f"read {path + '.txt'}: {e}")
                 
                 # 移動に成功したら評価
                 print(f"pcoccess start: {user_name}")
                 print(f"{path} -> {new_filename}")
 
                 # ファイルの移動に成功したらプロセス生成して処理開始
-                proccess.submit(ProcOneUser, user_name, new_filename, now)
+                proccess.submit(ProcOneUser, user_name, new_filename, now, memo)
 
 
             # 少し待つ

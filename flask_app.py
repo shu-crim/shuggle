@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, make_response, Markup
-from flask_httpauth import HTTPBasicAuth
+from flask_httpauth import HTTPBasicAuth, HTTPDigestAuth
 from werkzeug.utils import secure_filename
 import json
 
@@ -19,7 +19,8 @@ class Stats():
     train : list = [0, 0, 0.0]
     valid : list = [0, 0, 0.0]
     test : list = [0, 0, 0.0]
-    message : str = ""
+    message : str = ''
+    memo : str = ''
 
 
 class Page(Enum):
@@ -32,7 +33,8 @@ class Page(Enum):
 #Flaskオブジェクトの生成
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 2MB
-auth = HTTPBasicAuth()
+app.config['SECRET_KEY'] = 'secret key here'
+auth = HTTPDigestAuth()
 auth_users = {
     "root": "password",
 }
@@ -72,6 +74,7 @@ def GetUserStats() -> {}:
                     valid = TransIntIntFloat(raw[6:9])
                     test = TransIntIntFloat(raw[9:12])
                     message = raw[12]
+                    memo = raw[13] if len(raw) >= 14 else ""
 
                     # すべて読めたので保持
                     stats_read.username = user_name
@@ -81,6 +84,7 @@ def GetUserStats() -> {}:
                     stats_read.valid = valid
                     stats_read.test = test
                     stats_read.message = message
+                    stats_read.memo = memo
                     stats[user_name].append(stats_read)
                 except Exception as e:
                     print(e)
@@ -131,7 +135,7 @@ def menuHTML(page):
     return Markup(html)
 
 
-def CreateTableRow(stats, test = False, message = False):
+def CreateTableRow(stats, test=False, message=False, memo=False):
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
@@ -140,25 +144,29 @@ def CreateTableRow(stats, test = False, message = False):
     html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
     if test:
         html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+    if memo:
+        html_user += f'<td>{stats.memo}</td>'
     if message:
         html_user += f'<td>{stats.message}</td>'
     html_user += f'</tr>'
     return html_user
 
 
-def CreateTable(stats_list, test = False, message = False):
+def CreateTable(stats_list, test=False, message=False, memo=False):
     html_table = ""
     html_table += "<table class=\"table table-dark\" id=\"fav-table\">"
     html_table += "<thead><tr><th>参加者</th><th>提出日時</th><th>train(配布)正解率</th><th>valid正解率</th>"
     if test:
         html_table += "<th>test正解率</th>"
+    if memo:
+        html_table += "<th>メモ</th>"
     if message:
         html_table += "<th>メッセージ</th>"
     html_table += "</tr></thead>"
     html_table += "<tbody>"
 
     for stats in stats_list:
-        html_table += CreateTableRow(stats, test=test, message=message)
+        html_table += CreateTableRow(stats, test=test, message=message, memo=memo)
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -176,7 +184,7 @@ def get_pw(username):
 @app.route('/')
 def index():
     # /boardにリダイレクト
-    return redirect(url_for('/board'))
+    return redirect(url_for('board'))
 
 
 @app.route("/board")
@@ -190,7 +198,7 @@ def board():
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table = CreateTable(sorted_stats_list)
+    html_table = CreateTable(sorted_stats_list, memo=True)
 
     return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD))
 
@@ -207,7 +215,7 @@ def log():
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table = CreateTable(sorted_stats_list, message=True)
+    html_table = CreateTable(sorted_stats_list, message=True, memo=True)
 
     return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG))
 
@@ -234,8 +242,13 @@ def upload_file():
                 user = request.form['user']
                 save_dir = os.path.join(UPLOAD_DIR_ROOT, user)
                 if os.path.exists(save_dir):
-                    file.save(os.path.join(save_dir, secure_filename(file.filename)))
+                    new_filename = secure_filename(file.filename)
+                    file.save(os.path.join(save_dir, new_filename))
                     msg = f'{file.filename}がアップロードされました。'
+                    # メモを保存
+                    if request.form['memo'] != "":
+                        with open(os.path.join(save_dir, new_filename + '.txt'), mode='w', encoding='utf-8') as f:
+                            f.write(request.form['memo'])
                 else:
                     raise(ValueError("アップロード先のディレクトリが存在しません。"))
             except:
@@ -270,8 +283,8 @@ def upload_file():
     return response
   
 
-@auth.login_required
 @app.route('/admin')
+@auth.login_required
 def admin():
     user_stats = GetUserStats()
 
@@ -284,8 +297,6 @@ def admin():
 
     # 表を作成
     html_table = CreateTable(sorted_stats_list, test=True, message=True)
-
-    html_table += auth.username()
 
     return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN))
 
