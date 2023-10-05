@@ -4,3 +4,23 @@ body {
     padding-top: 60px;
     color: #eeeeee;
 }
+
+.tablesorter-headerUnSorted {
+    background-image: url('/static/img/icons-sort-32.png');
+    background-repeat: no-repeat;
+    background-position: center right;
+}
+
+.tablesorter-headerAsc {
+    background-image: url('/static/img/icons-sort-up-32.png');
+    background-repeat: no-repeat;
+    background-position: center right;
+    border-bottom: #fff 3px solid;
+}
+
+.tablesorter-headerDesc {
+    background-image: url('/static/img/icons-sort-down-32.png');
+    background-repeat: no-repeat;
+    background-position: center right;
+    border-bottom: #fff 3px solid;
+}

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, make_response, Markup
+from flask_httpauth import HTTPBasicAuth
 from werkzeug.utils import secure_filename
 import json
 
@@ -19,6 +20,22 @@ class Stats():
     valid : list = [0, 0, 0.0]
     test : list = [0, 0, 0.0]
     message : str = ""
+
+
+class Page(Enum):
+    BOARD = 1,
+    LOG = 2,
+    UPLOAD = 3,
+    ADMIN = 9
+
+
+#Flaskオブジェクトの生成
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 2MB
+auth = HTTPBasicAuth()
+auth_users = {
+    "root": "password",
+}
 
 
 def GetUserStats() -> {}:
@@ -74,10 +91,6 @@ def GetUserStats() -> {}:
 
     return stats
 
-class Page(Enum):
-    BOARD = 1,
-    LOG = 2,
-    UPLOAD = 3
 
 def menuHTML(page):
     html = """
@@ -98,6 +111,7 @@ def menuHTML(page):
                         <li class="nav-item">
                             <a class="nav-link{2} href="/upload">提出</a>
                         </li>
+                        {3}
                     </ul>
                 </div>
             </div>
@@ -106,7 +120,12 @@ def menuHTML(page):
     """.format(
         " active\" aria-current=\"page\"" if page == Page.BOARD else "\"",
         " active\" aria-current=\"page\"" if page == Page.LOG else "\"",
-        " active\" aria-current=\"page\"" if page == Page.UPLOAD else "\""
+        " active\" aria-current=\"page\"" if page == Page.UPLOAD else "\"",
+        """
+        <li class="nav-item">
+            <a class="nav-link active href="/admin">管理者</a>
+        </li>
+        """ if page == Page.ADMIN else ""
     )
 
     return Markup(html)
@@ -117,10 +136,10 @@ def CreateTableRow(stats, test = False, message = False):
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
     html_user += f'<td>{stats.datetime}</td>'
-    html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>-</td>'
-    html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>-</td>'
+    html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
+    html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
     if test:
-        html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>-</td>'
+        html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
     if message:
         html_user += f'<td>{stats.message}</td>'
     html_user += f'</tr>'
@@ -129,7 +148,7 @@ def CreateTableRow(stats, test = False, message = False):
 
 def CreateTable(stats_list, test = False, message = False):
     html_table = ""
-    html_table += "<table class=\"table table-dark\">"
+    html_table += "<table class=\"table table-dark\" id=\"fav-table\">"
     html_table += "<thead><tr><th>参加者</th><th>提出日時</th><th>train(配布)正解率</th><th>valid正解率</th>"
     if test:
         html_table += "<th>test正解率</th>"
@@ -146,14 +165,18 @@ def CreateTable(stats_list, test = False, message = False):
 
     return html_table
 
-#Flaskオブジェクトの生成
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 2MB
+
+@auth.get_password
+def get_pw(username):
+    if username in auth_users:
+        return auth_users.get(username)
+    return None
+
 
 @app.route('/')
 def index():
     # /boardにリダイレクト
-    return redirect(url_for('board'))
+    return redirect(url_for('/board'))
 
 
 @app.route("/board")
@@ -246,6 +269,26 @@ def upload_file():
 
     return response
   
+
+@auth.login_required
+@app.route('/admin')
+def admin():
+    user_stats = GetUserStats()
+
+    # 辞書をリスト化してソート
+    stats_list = []
+    for stats in user_stats.values():
+        for item in stats:
+            stats_list.append(item)
+    sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
+
+    # 表を作成
+    html_table = CreateTable(sorted_stats_list, test=True, message=True)
+
+    html_table += auth.username()
+
+    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN))
+
 
 if __name__ == "__main__":
     app.run(debug=False, host='0.0.0.0', port=5000)
