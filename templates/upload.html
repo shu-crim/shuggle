@@ -21,6 +21,13 @@
                 <div class="row">
                     <div class="col-12">
                         <h5>1. ユーザ名を選択してください（匿名希望の方はanonymousを選択）：</h5>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-2 d-flex align-items-end text-right justify-content-end d-flex align-items-center">
+                        ユーザ選択
+                    </div>
+                    <div class="col-10">
                         <select name="user" class="form-control-lg">
                             {% for username in username %}
                                 {% if selected_user == username  %}
@@ -30,7 +37,11 @@
                                 {% endif %}
                             {% endfor %}
                         </select>
-                        <br><br>
+                    </div>
+                </div>
+                <br><br>
+                <div class="row">
+                    <div class="col-12">
                         <h5>2. アップロードする.pyファイルを選択してアップロードボタンをクリックしてください：</h5>
                     </div>
                 </div>
