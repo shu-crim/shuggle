@@ -174,6 +174,27 @@ def CreateTable(stats_list, test=False, message=False, memo=False):
     return html_table
 
 
+def GetUserNames():
+    user_name_list = []
+    dir_list = glob.glob(os.path.join(UPLOAD_DIR_ROOT, "**/"))
+    for dir in dir_list:
+        # ディレクトリ名を取得→ユーザ名として使う
+        user_name = os.path.basename(os.path.dirname(dir))
+        user_name_list.append(user_name)
+
+    return user_name_list
+
+
+def CreateInProcHtml():
+    inproc_text = ''
+    user_name_list = GetUserNames()
+    for user_name in user_name_list:
+        if os.path.exists(os.path.join(USER_RESULT_DIR, f"{user_name}_inproc")):
+            inproc_text += f"{user_name} さんの評価を実行中です。<br>"
+
+    return inproc_text + '<br>'
+    
+
 @auth.get_password
 def get_pw(username):
     if username in auth_users:
@@ -200,7 +221,10 @@ def board():
     # 表を作成
     html_table = CreateTable(sorted_stats_list, memo=True)
 
-    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD))
+    # 評価中の表示
+    inproc_text = CreateInProcHtml()
+
+    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD), inproc_text=Markup(inproc_text))
 
 
 @app.route("/log")
@@ -217,7 +241,10 @@ def log():
     # 表を作成
     html_table = CreateTable(sorted_stats_list, message=True, memo=True)
 
-    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG))
+    # 評価中の表示
+    inproc_text = CreateInProcHtml()
+
+    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG), inproc_text=Markup(inproc_text))
 
 
 def allowed_file(filename):
@@ -265,12 +292,12 @@ def upload_file():
             user = 'anonymous'
 
     # ディレクトリ名からユーザ名のlistを作成
-    user_name_list = []
-    dir_list = glob.glob(os.path.join(UPLOAD_DIR_ROOT, "**/"))
-    for dir in dir_list:
-        # ディレクトリ名を取得→ユーザ名として使う
-        user_name = os.path.basename(os.path.dirname(dir))
-        user_name_list.append(user_name)
+    user_name_list = GetUserNames()
+    # dir_list = glob.glob(os.path.join(UPLOAD_DIR_ROOT, "**/"))
+    # for dir in dir_list:
+    #     # ディレクトリ名を取得→ユーザ名として使う
+    #     user_name = os.path.basename(os.path.dirname(dir))
+    #     user_name_list.append(user_name)
 
     response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD)))
 
@@ -298,7 +325,10 @@ def admin():
     # 表を作成
     html_table = CreateTable(sorted_stats_list, test=True, message=True)
 
-    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN))
+    # 評価中の表示
+    inproc_text = CreateInProcHtml()
+
+    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN), inproc_text=Markup(inproc_text))
 
 
 if __name__ == "__main__":

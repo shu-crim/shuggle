@@ -230,6 +230,12 @@ def ProcOneUser(user_name, new_filename, now, memo=''):
 
         output_csv_file.write(f"{message},{memo}")
 
+    # 処理中であることを示すファイルを削除
+    try:
+        os.remove(os.path.join(OUTPUT_EVERY_USER_DIR, f"{user_name}_inproc"))
+    except:
+        print(f"{user_name}_inproc を削除できませんでした。")
+
 
 def main():
     with ProcessPoolExecutor(max_workers=4) as proccess:
@@ -271,6 +277,10 @@ def main():
                 # 移動に成功したら評価
                 print(f"pcoccess start: {user_name}")
                 print(f"{path} -> {new_filename}")
+
+                # 評価中であることを示すファイルを生成
+                with open(os.path.join(OUTPUT_EVERY_USER_DIR, f"{user_name}_inproc"), "w", encoding='shift_jis') as f:
+                    pass
 
                 # ファイルの移動に成功したらプロセス生成して処理開始
                 proccess.submit(ProcOneUser, user_name, new_filename, now, memo)
