@@ -253,7 +253,7 @@ def board():
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD, TASK_NAME), inproc_text=Markup(inproc_text))
+    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD, TASK_NAME), task_name=TASK_NAME, inproc_text=Markup(inproc_text))
 
 
 @app.route("/log")
@@ -273,7 +273,7 @@ def log():
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG, TASK_NAME), inproc_text=Markup(inproc_text))
+    return render_template('log.html', task_name=TASK_NAME, table_log=Markup(html_table), menu=menuHTML(Page.LOG, TASK_NAME), inproc_text=Markup(inproc_text))
 
 
 def allowed_file(filename):
@@ -323,7 +323,7 @@ def upload_file():
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = GetUserNames()
 
-    response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD, TASK_NAME)))
+    response = make_response(render_template('upload.html', task_name=TASK_NAME, message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD, TASK_NAME)))
 
     # クッキー書き込み
     if cookie_write:
@@ -352,7 +352,7 @@ def admin():
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, TASK_NAME), inproc_text=Markup(inproc_text))
+    return render_template('log.html', task_name=TASK_NAME, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, TASK_NAME), inproc_text=Markup(inproc_text))
 
 
 if __name__ == "__main__":
