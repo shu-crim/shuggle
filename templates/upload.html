@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Shuggle</title>
+        <title>Shuggle | {{ task_name }}</title>
         <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
         <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
     </head>
@@ -11,10 +11,14 @@
         {{menu}}
 
         <div class="container col-11">
-            <h1>処理モジュール(*.py)のアップロード</h1>
+            <h1>処理モジュール(*.py)の提出</h1>
         </div>
 
         <br>
+
+        <div class="container col-11">
+            <h2>A. 提出</h2>
+        </div>
 
         <div class="container col-11">
             <form action="" method="POST" enctype="multipart/form-data">
@@ -71,6 +75,45 @@
 
         <div class="container col-11">
             {{message}}
+        </div>
+        
+        <br><br>
+
+        <div class="container col-11">
+            <h2>B. 提出するモジュールのルール</h2>
+            <h3>ファイルについて</h3>
+            <ul>
+                <li>ファイルサイズの上限は2MBです。</li>
+                <li>ファイル名は任意です。拡張子は.pyとしてください。（例えば hoge.py でもmy_proc.pyでもOK）</li>
+                <li>関数 recognition を含んでください。入力データを引数で受け取り、タスクごとに指定された型を返す関数です。</li>
+                <ul>
+                    <li><a href="/task">タスク説明</a>でダウンロードできる基本パックに、関数 recognition を含むサンプルコードが入っています。サンプルコードに処理を追記してアップロードするのがおすすめです。</li>
+                    <li>入力データinput_dataを受け取り、int型を返す場合の関数宣言「def recognition(input_data) -> int:」</li>
+                </ul>
+            </ul>
+            <h3>実装する処理について</h3>
+            <ul>
+                <li>1データに対する処理の制限時間は1秒です。制限時間を超えるとタイムアウトして評価がされません。</li>
+                <li>使用可能なpythonライブラリに限りがあります。以下が一覧です。追加希望があればご連絡ください。</li>
+                <ul>
+                    <li>NumPy</li>
+                    <li>OpenCV</li>
+                </ul>
+            </ul>
+            <h3>禁止事項</h3>
+            <ul>
+                <li>セキュリティに関わる行為</li>
+                <ul>
+                    <li>サーバ上のファイルへのアクセスを試みることは禁止です。</li>
+                    <li>関数外のメモリへのアクセスを試みることは禁止です。</li>
+                </ul>
+                <li>公序良俗に反する行為</li>
+                <ul>
+                    <li>提出時メモは公開されます。</li>
+                    <li>提出したファイルは公開される可能性があります。</li>
+                </ul>
+            </ul>
+
         </div>
 
         <script src="static/js/bootstrap.js"></script>
