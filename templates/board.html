@@ -11,35 +11,9 @@
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
 
         <script>
-            $(document).ready(function() {
-                $('#fav-table').tablesorter();
-            });
-
-            var current_timestamp = ""
-            window.addEventListener('DOMContentLoaded', function(){
-                // 1秒ごとに実行
-                setInterval(() => {
-                    var request = new XMLHttpRequest()
-                    request.open("GET", "/timestamp", true);
-                    request.onreadystatechange = function() {
-                        if (request.readyState == 4 && request.status == 200) {
-                            //受信完了時の処理
-                            var timestamp = document.createTextNode(decodeURI(request.responseText));
-
-                            if (current_timestamp == "") {
-                                current_timestamp = timestamp;
-                            } else {
-                                if (current_timestamp.data != timestamp.data) {
-                                    console.log("reload()");
-                                    location.reload()
-                                }
-                            }
-                        }
-                    }
-                    request.send("");
-                }, 1000);
-            });
+            var num_col = {{ num_col }};
         </script>
+        
     </head>
     <body>
         {{menu}}
@@ -56,5 +30,6 @@
             {{table_board}}
         </div>
 
+        <script src="static/js/table.js"></script>
         <script src="static/js/bootstrap.js"></script>
 </html>

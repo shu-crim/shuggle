@@ -165,15 +165,27 @@ def CreateTableRow(stats, test=False, message=False, memo=False):
 
 
 def CreateTable(stats_list, test=False, message=False, memo=False):
+    num_col = 0
     html_table = ""
     html_table += "<table class=\"table table-dark\" id=\"fav-table\">"
-    html_table += "<thead><tr><th>参加者</th><th>提出日時</th><th>train(配布)正解率</th><th>valid正解率</th>"
+    html_table += "<thead><tr>"
+    html_table += f"<th id=\"th-{num_col}\">参加者</th>"
+    num_col += 1
+    html_table += f"<th id=\"th-{num_col}\">提出日時</th>"
+    num_col += 1
+    html_table += f"<th id=\"th-{num_col}\">train(配布)正解率</th>"
+    num_col += 1
+    html_table += f"<th id=\"th-{num_col}\">valid正解率</th>"
+    num_col += 1
     if test:
-        html_table += "<th>test正解率</th>"
+        html_table += f"<th id=\"th-{num_col}\">test正解率</th>"
+        num_col += 1
     if memo:
-        html_table += "<th>メモ</th>"
+        html_table += f"<th id=\"th-{num_col}\">メモ</th>"
+        num_col += 1
     if message:
-        html_table += "<th>メッセージ</th>"
+        html_table += f"<th id=\"th-{num_col}\">メッセージ</th>"
+        num_col += 1
     html_table += "</tr></thead>"
     html_table += "<tbody>"
 
@@ -183,7 +195,7 @@ def CreateTable(stats_list, test=False, message=False, memo=False):
     html_table += "</tbody>"
     html_table += "</table>"
 
-    return html_table
+    return html_table, num_col
 
 
 def GetUserNames():
@@ -248,12 +260,12 @@ def board():
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table = CreateTable(sorted_stats_list, memo=True)
+    html_table, num_col = CreateTable(sorted_stats_list, memo=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD, TASK_NAME), task_name=TASK_NAME, inproc_text=Markup(inproc_text))
+    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD, TASK_NAME), task_name=TASK_NAME, inproc_text=Markup(inproc_text), num_col=num_col)
 
 
 @app.route("/log")
@@ -268,12 +280,12 @@ def log():
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table = CreateTable(sorted_stats_list, message=True, memo=True)
+    html_table, num_col = CreateTable(sorted_stats_list, message=True, memo=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('log.html', task_name=TASK_NAME, table_log=Markup(html_table), menu=menuHTML(Page.LOG, TASK_NAME), inproc_text=Markup(inproc_text))
+    return render_template('log.html', task_name=TASK_NAME, table_log=Markup(html_table), menu=menuHTML(Page.LOG, TASK_NAME), inproc_text=Markup(inproc_text), num_col=num_col)
 
 
 def allowed_file(filename):
