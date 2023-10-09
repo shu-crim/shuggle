@@ -1,13 +1,19 @@
 $(document).ready(function() {
     var param = GetQueryString();
-    console.log(param)
+
+    // 自動更新の設定
+    if (param != null && param["autoreload"] != undefined) {
+        if (param["autoreload"] == "1") {
+            check_box_auto_reload.checked = true;
+        }
+    }
+
+    // ソート状態の設定
     var sort_index = 1; // デフォルトは提出日時
     var desc = 1; // デフォルトは降順
     if (param != null && param["sortindex"] != undefined && param["desc"] != undefined) {
         sort_index = param["sortindex"];
         desc = param["desc"];
-        console.log("sort_index: " + sort_index)
-        console.log("desc: " + desc)
     }
 
     $('#fav-table').tablesorter({ 
@@ -16,10 +22,17 @@ $(document).ready(function() {
     });
 });
 
+var check_box_auto_reload = document.getElementById("CheckBoxAutoReload")
 var current_timestamp = ""
 window.addEventListener('DOMContentLoaded', function(){
     // 1秒ごとに実行
     setInterval(() => {
+        // 自動更新がONかチェック
+        if (!check_box_auto_reload.checked && current_timestamp != "") {
+            return;
+        }
+
+        // タイムスタンプを確認して更新があればリロード
         var request = new XMLHttpRequest()
         request.open("GET", "/timestamp", true);
         request.onreadystatechange = function() {
@@ -31,7 +44,6 @@ window.addEventListener('DOMContentLoaded', function(){
                     current_timestamp = timestamp;
                 } else {
                     if (current_timestamp.data != timestamp.data) {
-                        console.log("reload()");
                         reload();
                     }
                 }
@@ -41,40 +53,57 @@ window.addEventListener('DOMContentLoaded', function(){
     }, 1000);
 });
 
+
+// 自動更新をONにしたときには一度強制リロード
+check_box_auto_reload.addEventListener('click', checkBoxClick);
+function checkBoxClick() {
+    if (check_box_auto_reload.checked) {
+        reload();
+    }
+}
+
+
+// 手動のリロードボタン
+let button_reload = document.getElementById('ButtonReload');
+button_reload.addEventListener('click', butotnReloadClick);
+function butotnReloadClick() {
+    reload();
+}
+
+
 function reload() {
     // 現在のソート状態を取得
     var index_sorted = -1;
-    var ascending = true
+    var descending = true
     for (let i = 0; i < num_col; i++) {
         var id = "th-" + i
         var class_name = document.getElementById(id).className
         if (class_name.includes('tablesorter-headerAsc')) {
             index_sorted = i;
-            ascending = true;
+            descending = false;
         } else if(class_name.includes('tablesorter-headerDesc')) {
             index_sorted = i;
-            ascending = false;
+            descending = true;
         }
     }
 
     // パラメータを付与してリロード
     let url = window.location.href;
     url = url.replace(location.search , '');
+
+    // 自動更新
+    url += "?autoreload=" + (check_box_auto_reload.checked ? "1" : "0");
+
+    // ソート状態
     if (index_sorted >= 0){
-        url += "?sortindex=" + index_sorted
-        if (ascending) {
-            url += "&desc=0"
-        } else {
-            url += "&desc=1"
-        }                    
-    }                
+        url += "&sortindex=" + index_sorted + "&desc=" + (descending ? "1" : "0");
+    }
+
     window.location.href = url
 }
 
 // URLからパラメータを取得
 function GetQueryString() {
-    console.log("GetQueryString()")
-    console.log("document.location.search.length: " + location.search.length)
     if (location.search.length > 1) {
         var query = document.location.search.substring(1);
         var parameters = query.split('&');
