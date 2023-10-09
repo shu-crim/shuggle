@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response, Markup
+from flask import Flask, render_template, request, redirect, url_for, make_response, Markup, send_from_directory
 from flask_httpauth import HTTPBasicAuth, HTTPDigestAuth
 from werkzeug.utils import secure_filename
 import json
@@ -13,7 +13,7 @@ USER_RESULT_DIR = r"./output/user"
 UPLOAD_DIR_ROOT = r"./upload_dir"
 TIMESTAMP_FILE_PATH = r"./output/timestamp.txt"
 ALLOWED_EXTENSIONS = set(['py'])
-TASK_NAME = "タスク"
+TASK_NAME = "Task X"
 
 
 class Stats():
@@ -230,6 +230,11 @@ def get_pw(username):
 def index():
     # /boardにリダイレクト
     return redirect(url_for('board'))
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static/img'), 'favicon.ico', )
 
 
 @app.route('/timestamp', methods=['GET'])
