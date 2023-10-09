@@ -35,12 +35,12 @@ def read_dataset(path_csv):
     return filename_list, input_data_list, correct_list
 
 
-def recognition(input_data):
+def recognition(input_data) -> int:
     # ここに処理を書く
 
 
-    # 整数で推定クラス(1,2,3,4,5)を返す
-    return random.randint(1, 5)
+    # 整数で推定クラスを返す
+    return random.randint(1, NUM_CLASS)
 
 
 def main():
