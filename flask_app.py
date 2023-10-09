@@ -364,12 +364,12 @@ def admin():
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table = CreateTable(sorted_stats_list, test=True, message=True)
+    html_table, num_col = CreateTable(sorted_stats_list, test=True, message=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('log.html', task_name=TASK_NAME, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, TASK_NAME), inproc_text=Markup(inproc_text))
+    return render_template('log.html', task_name=TASK_NAME, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, TASK_NAME), inproc_text=Markup(inproc_text), num_col=num_col)
 
 
 if __name__ == "__main__":
