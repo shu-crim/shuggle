@@ -22,7 +22,13 @@ INPUT_DATA_TRAIN_DIR = r"./input_data/train"
 INPUT_DATA_VALID_DIR = r"./input_data/valid" 
 INPUT_DATA_TEST_DIR = r"./input_data/test"
 CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
+TIMESTAMP_FILE_PATH = r"./output/timestamp.txt"
 PROC_TIMEOUT_SEC = 1
+
+
+def UpdateTtimestamp():
+    with open(TIMESTAMP_FILE_PATH, "w") as f:
+        f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
 def read_dataset(path_csv):
@@ -236,6 +242,9 @@ def ProcOneUser(user_name, new_filename, now, memo=''):
     except:
         print(f"{user_name}_inproc を削除できませんでした。")
 
+    # タイムスタンプ更新
+    UpdateTtimestamp()
+
 
 def main():
     with ProcessPoolExecutor(max_workers=4) as proccess:
@@ -281,6 +290,9 @@ def main():
                 # 評価中であることを示すファイルを生成
                 with open(os.path.join(OUTPUT_EVERY_USER_DIR, f"{user_name}_inproc"), "w", encoding='shift_jis') as f:
                     pass
+
+                # タイムスタンプ更新
+                UpdateTtimestamp()
 
                 # ファイルの移動に成功したらプロセス生成して処理開始
                 proccess.submit(ProcOneUser, user_name, new_filename, now, memo)

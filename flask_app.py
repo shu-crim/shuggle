@@ -8,9 +8,12 @@ import glob
 import datetime
 from enum import Enum
 
+
 USER_RESULT_DIR = r"./output/user"
 UPLOAD_DIR_ROOT = r"./upload_dir"
+TIMESTAMP_FILE_PATH = r"./output/timestamp.txt"
 ALLOWED_EXTENSIONS = set(['py'])
+
 
 class Stats():
     username : str
@@ -64,10 +67,11 @@ def GetUserStats() -> {}:
                 if not line:
                     break
 
-                try:
-                    raw = line.rstrip(os.linesep).split(",")
-                    stats_read = Stats()
+                raw = line.rstrip(os.linesep).split(",")
+                if len(raw) < 13:
+                    continue
 
+                try:
                     dt = datetime.datetime.strptime(raw[0] + " " + raw[1], "%Y/%m/%d %H:%M:%S")
                     filename = raw[2]
                     train = TransIntIntFloat(raw[3:6])
@@ -77,6 +81,7 @@ def GetUserStats() -> {}:
                     memo = raw[13] if len(raw) >= 14 else ""
 
                     # すべて読めたので保持
+                    stats_read = Stats()
                     stats_read.username = user_name
                     stats_read.datetime = dt
                     stats_read.filename = filename
@@ -208,6 +213,17 @@ def index():
     return redirect(url_for('board'))
 
 
+@app.route('/timestamp', methods=['GET'])
+def get_timestamp():
+    try:
+        with open(TIMESTAMP_FILE_PATH, "r") as f:
+            timestamp = f.read()
+    except:
+        timestamp = ''
+
+    return timestamp
+
+
 @app.route("/board")
 def board():
     user_stats = GetUserStats()
@@ -293,11 +309,6 @@ def upload_file():
 
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = GetUserNames()
-    # dir_list = glob.glob(os.path.join(UPLOAD_DIR_ROOT, "**/"))
-    # for dir in dir_list:
-    #     # ディレクトリ名を取得→ユーザ名として使う
-    #     user_name = os.path.basename(os.path.dirname(dir))
-    #     user_name_list.append(user_name)
 
     response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD)))
 
