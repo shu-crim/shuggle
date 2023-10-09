@@ -13,6 +13,7 @@ USER_RESULT_DIR = r"./output/user"
 UPLOAD_DIR_ROOT = r"./upload_dir"
 TIMESTAMP_FILE_PATH = r"./output/timestamp.txt"
 ALLOWED_EXTENSIONS = set(['py'])
+TASK_NAME = "タスク"
 
 
 class Stats():
@@ -27,9 +28,10 @@ class Stats():
 
 
 class Page(Enum):
-    BOARD = 1,
-    LOG = 2,
-    UPLOAD = 3,
+    TASK = 1,
+    BOARD = 2,
+    LOG = 3,
+    UPLOAD = 4,
     ADMIN = 9
 
 
@@ -101,7 +103,7 @@ def GetUserStats() -> {}:
     return stats
 
 
-def menuHTML(page):
+def menuHTML(page, task_name):
     html = """
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
@@ -112,21 +114,26 @@ def menuHTML(page):
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link{0} href="/board">評価結果一覧</a>
+                            <a class="nav-link{0} href="/task">{1}</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link{1} href="/log">履歴</a>
+                            <a class="nav-link{2} href="/board">評価結果</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link{2} href="/upload">提出</a>
+                            <a class="nav-link{3} href="/log">履歴</a>
                         </li>
-                        {3}
+                        <li class="nav-item">
+                            <a class="nav-link{4} href="/upload">提出</a>
+                        </li>
+                        {5}
                     </ul>
                 </div>
             </div>
         </nav>
 
     """.format(
+        " active\" aria-current=\"page\"" if page == Page.TASK else "\"",
+        task_name,
         " active\" aria-current=\"page\"" if page == Page.BOARD else "\"",
         " active\" aria-current=\"page\"" if page == Page.LOG else "\"",
         " active\" aria-current=\"page\"" if page == Page.UPLOAD else "\"",
@@ -224,6 +231,12 @@ def get_timestamp():
     return timestamp
 
 
+@app.route("/task")
+def task():
+
+    return render_template('task.html', menu=menuHTML(Page.TASK, TASK_NAME), task_name=TASK_NAME)
+
+
 @app.route("/board")
 def board():
     user_stats = GetUserStats()
@@ -240,7 +253,7 @@ def board():
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD), inproc_text=Markup(inproc_text))
+    return render_template('board.html', table_board=Markup(html_table), menu=menuHTML(Page.BOARD, TASK_NAME), inproc_text=Markup(inproc_text))
 
 
 @app.route("/log")
@@ -260,7 +273,7 @@ def log():
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG), inproc_text=Markup(inproc_text))
+    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.LOG, TASK_NAME), inproc_text=Markup(inproc_text))
 
 
 def allowed_file(filename):
@@ -310,7 +323,7 @@ def upload_file():
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = GetUserNames()
 
-    response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD)))
+    response = make_response(render_template('upload.html', message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD, TASK_NAME)))
 
     # クッキー書き込み
     if cookie_write:
@@ -339,7 +352,7 @@ def admin():
     # 評価中の表示
     inproc_text = CreateInProcHtml()
 
-    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN), inproc_text=Markup(inproc_text))
+    return render_template('log.html', table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, TASK_NAME), inproc_text=Markup(inproc_text))
 
 
 if __name__ == "__main__":
