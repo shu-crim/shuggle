@@ -6,6 +6,30 @@
         <title>Shuggle | {{ task_name }}</title>
         <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
         <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
+
+        <script>
+            // ユーザを選択したときに選択を保存してページ読み込み時に復元
+            var key_user_select = "user_select"
+            var user_select = null;
+
+            $(document).ready(function() {
+                user_select = document.getElementById('user-select');
+                user_select.onchange = selectChange;
+
+                var local_storage_user_select = localStorage.getItem(key_user_select);
+                if (local_storage_user_select != null) {
+                    user_select.value = local_storage_user_select;
+                }
+            });
+
+            function selectChange() {
+                localStorage.setItem(key_user_select, user_select.value);
+            }
+        </script>
+    
     </head>
     <body>
         {{menu}}
@@ -32,13 +56,9 @@
                         ユーザ選択
                     </div>
                     <div class="col-10">
-                        <select name="user" class="form-control-lg">
+                        <select name="user" class="form-control-lg" id="user-select">
                             {% for username in username %}
-                                {% if selected_user == username  %}
-                                    <option value="{{ username }}" selected>{{ username }}</option>
-                                {% else %}
-                                    <option value="{{ username }}">{{ username }}</option>
-                                {% endif %}
+                                <option value="{{ username }}">{{ username }}</option>
                             {% endfor %}
                         </select>
                     </div>

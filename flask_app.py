@@ -300,12 +300,10 @@ def allowed_file(filename):
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     msg = ""
-    cookie_write = False
 
     if request.method == 'POST':
         file = request.files['file']
         user = request.form['user']
-        cookie_write = True
         if not file:
             msg = "ファイルが選択されていません。"
         elif not allowed_file(file.filename):
@@ -327,28 +325,10 @@ def upload_file():
             except:
                 msg = "アップロードに失敗しました。"
 
-
-    if not cookie_write:
-        # 既存のクッキーから過去の選択を読み出し
-        user_info = request.cookies.get('user_info')
-        if user_info is not None:
-            user_info = json.loads(user_info)
-            user = user_info['name']
-        else:
-            user = 'anonymous'
-
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = GetUserNames()
 
-    response = make_response(render_template('upload.html', task_name=TASK_NAME, message=msg, username=user_name_list, selected_user=user, menu=menuHTML(Page.UPLOAD, TASK_NAME)))
-
-    # クッキー書き込み
-    if cookie_write:
-        expires = int(datetime.datetime.now().timestamp()) + 10 * 24 * 3600
-        user_info = {'name': user} 
-        response.set_cookie('user_info', value=json.dumps(user_info), expires=expires)
-
-    return response
+    return render_template('upload.html', task_name=TASK_NAME, message=msg, username=user_name_list, menu=menuHTML(Page.UPLOAD, TASK_NAME))
   
 
 @app.route('/admin')
