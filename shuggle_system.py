@@ -16,18 +16,15 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 NUM_CLASS = 5
 UPLOAD_DIR = r"./upload_dir"
 USER_MODULE_DIR_NAME = r"user_module"
-OUTPUT_DETAIL_DIR = r"./output/detail"
-OUTPUT_EVERY_USER_DIR = r"./output/user"
-INPUT_DATA_TRAIN_DIR = r"./input_data/train" 
-INPUT_DATA_VALID_DIR = r"./input_data/valid" 
-INPUT_DATA_TEST_DIR = r"./input_data/test"
+OUTPUT_DIR = r"./output"
+INPUT_DATA_DIR =r"./input_data"
 CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
-TIMESTAMP_FILE_PATH = r"./output/timestamp.txt"
+TIMESTAMP_FILE_NAME = r"timestamp.txt"
 PROC_TIMEOUT_SEC = 1
 
 
-def UpdateTtimestamp():
-    with open(TIMESTAMP_FILE_PATH, "w") as f:
+def UpdateTtimestamp(task_id):
+    with open(os.path.join(OUTPUT_DIR, task_id, TIMESTAMP_FILE_NAME), "w") as f:
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
@@ -116,10 +113,10 @@ class Result:
         self.answer = answer
 
 
-def evaluate3data(module_name, user_name):
+def evaluate3data(task_id, module_name, user_name):
     try:
         # ユーザ作成の処理を読み込む
-        user_module = importlib.import_module(f"{USER_MODULE_DIR_NAME}.{module_name}")
+        user_module = importlib.import_module(f"{USER_MODULE_DIR_NAME}.{task_id}.{module_name}")
     except:
         raise(ValueError("モジュールを読み込めません。"))
     
@@ -136,7 +133,7 @@ def evaluate3data(module_name, user_name):
 
     try:    
         # train
-        num_train, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_TRAIN_DIR, CORRECT_ANSWER_CSV_FILENAME), func_recognition)
+        num_train, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_DIR, task_id, "train", CORRECT_ANSWER_CSV_FILENAME), func_recognition)
         if num_train == 0:
             return []
         for i in range(num_train):
@@ -145,7 +142,7 @@ def evaluate3data(module_name, user_name):
         print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, totla: {total_proc_time : .1f} s')
 
         # valid
-        num_valid, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_VALID_DIR, CORRECT_ANSWER_CSV_FILENAME), func_recognition)
+        num_valid, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_DIR, task_id, "valid", CORRECT_ANSWER_CSV_FILENAME), func_recognition)
         if num_valid == 0:
             return []
         for i in range(num_valid):
@@ -154,7 +151,7 @@ def evaluate3data(module_name, user_name):
         print(f'Valiid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
 
         # test
-        num_test, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_TEST_DIR, CORRECT_ANSWER_CSV_FILENAME), func_recognition)
+        num_test, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_DIR, task_id, "test", CORRECT_ANSWER_CSV_FILENAME), func_recognition)
         if num_test == 0:
             return []
         for i in range(num_test):
@@ -170,12 +167,12 @@ def evaluate3data(module_name, user_name):
     return result_list
 
 
-def ProcOneUser(user_name, new_filename, now, memo=''):
+def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     # 処理と評価を実行
     proc_success = False
     message = ''
     try:
-        result_list = evaluate3data(os.path.splitext(new_filename)[0], user_name) # 拡張子を除く
+        result_list = evaluate3data(task_id, os.path.splitext(new_filename)[0], user_name) # 拡張子を除く
         proc_success = True
     except Exception as e:
         proc_success = False
@@ -198,7 +195,7 @@ def ProcOneUser(user_name, new_filename, now, memo=''):
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
-        with open(os.path.join(OUTPUT_DETAIL_DIR, output_csv_filename), "w", encoding='shift_jis') as output_csv_file:
+        with open(os.path.join(OUTPUT_DIR, task_id, "detail", output_csv_filename), "w", encoding='shift_jis') as output_csv_file:
             # 集計
             output_csv_file.write(f"filename,{os.path.basename(new_filename)}\n\n")
             output_csv_file.write("type,num_data,true,false,accuracy\n")
@@ -214,7 +211,7 @@ def ProcOneUser(user_name, new_filename, now, memo=''):
                 output_csv_file.write(f"{result.data_type.name},{result.filename},{result.correct},{result.answer},{1 if result.correct == result.answer else 0}\n")
 
     # ユーザ毎の結果出力
-    csv_path = os.path.join(OUTPUT_EVERY_USER_DIR, user_name + ".csv")
+    csv_path = os.path.join(OUTPUT_DIR, task_id, "user", user_name + ".csv")
     if not os.path.exists(csv_path):
         # ファイルが無いのでヘッダを付ける
         with open(csv_path, "w", encoding='shift_jis') as output_csv_file:
@@ -238,64 +235,69 @@ def ProcOneUser(user_name, new_filename, now, memo=''):
 
     # 処理中であることを示すファイルを削除
     try:
-        os.remove(os.path.join(OUTPUT_EVERY_USER_DIR, f"{user_name}_inproc"))
+        os.remove(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_name}_inproc"))
     except:
         print(f"{user_name}_inproc を削除できませんでした。")
 
     # タイムスタンプ更新
-    UpdateTtimestamp()
+    UpdateTtimestamp(task_id)
 
 
 def main():
     with ProcessPoolExecutor(max_workers=4) as proccess:
         while True:
             # ディレクトリの一覧を作成して走査
-            dir_list = glob.glob(UPLOAD_DIR + '/**/')
+            dir_list_tasks = glob.glob(UPLOAD_DIR + '/**/')
+            for dir_task in dir_list_tasks:                    
+                # ディレクトリ名を取得→タスクIDとして使う
+                task_id = os.path.basename(os.path.dirname(dir_task))
 
-            for dir in dir_list:
-                # ディレクトリ名を取得→ユーザ名として使う
-                user_name = os.path.basename(os.path.dirname(dir))
+                # ディレクトリの一覧を作成して走査
+                dir_list_users = glob.glob(dir_task + '/**/')
+                for dir_user in dir_list_users:  
+                    # ディレクトリ名を取得→ユーザ名として使う
+                    user_name = os.path.basename(os.path.dirname(dir_user))
 
-                # ユーザのディレクトリ内の.pyファイルの一覧を作成して走査
-                py_files = glob.glob(os.path.join(UPLOAD_DIR, user_name, "*.py"))
+                    # ユーザのディレクトリ内の.pyファイルの一覧を作成して走査
+                    py_files = glob.glob(os.path.join(dir_user, "*.py"))
 
-                if len(py_files) == 0:
-                    continue
-                
-                path = py_files[0] # 最初に発見したファイルのみを対象とする
+                    if len(py_files) == 0:
+                        continue
+                    
+                    path = py_files[0] # 最初に発見したファイルのみを対象とする
 
-                # ファイル移動を試みる
-                now = datetime.datetime.now()
-                new_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S_') + os.path.basename(path)
-                try:
-                    shutil.move(path, os.path.join("./", USER_MODULE_DIR_NAME, new_filename))
-                except:
-                    continue
-
-                # メモもあれば読み込んで移動
-                memo = ''
-                if os.path.exists(path + '.txt'):
+                    # ファイル移動を試みる
+                    now = datetime.datetime.now()
+                    new_filename = user_name + "_" + task_id + "_" + now.strftime('%Y%m%d_%H%M%S_') + os.path.basename(path)
                     try:
-                        with open(path + '.txt', encoding='utf-8') as f:
-                            memo = f.read()
+                        shutil.move(path, os.path.join("./", USER_MODULE_DIR_NAME, task_id, new_filename))
+                    except:
+                        continue
 
-                        shutil.move(path + '.txt', os.path.join("./", USER_MODULE_DIR_NAME, new_filename + '.txt'))
-                    except Exception as e:
-                        print(f"read {path + '.txt'}: {e}")
-                
-                # 移動に成功したら評価
-                print(f"pcoccess start: {user_name}")
-                print(f"{path} -> {new_filename}")
+                    # メモもあれば読み込んで移動
+                    memo = ''
+                    if os.path.exists(path + '.txt'):
+                        try:
+                            with open(path + '.txt', encoding='utf-8') as f:
+                                memo = f.read()
 
-                # 評価中であることを示すファイルを生成
-                with open(os.path.join(OUTPUT_EVERY_USER_DIR, f"{user_name}_inproc"), "w", encoding='shift_jis') as f:
-                    pass
+                            shutil.move(path + '.txt', os.path.join("./", USER_MODULE_DIR_NAME, task_id, new_filename + '.txt'))
+                        except Exception as e:
+                            print(f"read {path + '.txt'}: {e}")
+                    
+                    # 移動に成功したら評価
+                    print(f"pcoccess start: {user_name}")
+                    print(f"{path} -> {new_filename}")
 
-                # タイムスタンプ更新
-                UpdateTtimestamp()
+                    # 評価中であることを示すファイルを生成
+                    with open(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_name}_inproc"), "w", encoding='shift_jis') as f:
+                        pass
 
-                # ファイルの移動に成功したらプロセス生成して処理開始
-                proccess.submit(ProcOneUser, user_name, new_filename, now, memo)
+                    # タイムスタンプ更新
+                    UpdateTtimestamp(task_id)
+
+                    # ファイルの移動に成功したらプロセス生成して処理開始
+                    proccess.submit(ProcOneUser, task_id, user_name, new_filename, now, memo)
 
 
             # 少し待つ

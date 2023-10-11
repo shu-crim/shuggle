@@ -11,7 +11,8 @@
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
 
         <script>
-            var num_col = {{ num_col }};
+            var num_col = Number("{{ num_col }}");
+            var task_id = "{{ task_id }}";
         </script>
         
     </head>
@@ -49,6 +50,6 @@
             {{table_board}}
         </div>
 
-        <script src="static/js/table.js"></script>
-        <script src="static/js/bootstrap.js"></script>
+        <script src="{{url_for('static', filename='js/table.js')}}"></script>
+        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
 </html>

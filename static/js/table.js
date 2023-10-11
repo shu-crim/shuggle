@@ -67,7 +67,7 @@ window.addEventListener('DOMContentLoaded', function(){
 
         // タイムスタンプを確認して更新があればリロード
         var request = new XMLHttpRequest()
-        request.open("GET", "/timestamp", true);
+        request.open("GET", "/" + task_id + "/timestamp", true);
         request.onreadystatechange = function() {
             if (request.readyState == 4 && request.status == 200) {
                 //受信完了時の処理
