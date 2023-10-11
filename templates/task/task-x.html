@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shuggle | {{ task_name }}</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+    </head>
+    <body>
+        {{menu}}
+
+        <div class="container col-11">
+            <h1>{{ task_name }}</h1>
+        </div>
+
+        <br>
+
+        <div class="container col-11">
+            <ul>
+                <li>タスク説明</li>
+                    <ul>
+                        <li>段下げ</li>
+                        <li>段下げ</li>
+                    </ul>
+                <li>タスク説明</li>
+                    <ol>
+                        <li>番号付き</li>
+                        <li>番号付き</li>
+                    </ol>
+            </ul>
+        </div>
+
+        <script src="static/js/bootstrap.js"></script>
+    </body>
+</html>
