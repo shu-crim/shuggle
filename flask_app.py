@@ -13,8 +13,18 @@ INPUT_DATA_DIR = r"./input_data"
 OUTPUT_DIR = r"./output"
 UPLOAD_DIR_ROOT = r"./upload_dir"
 ALLOWED_EXTENSIONS = set(['py'])
-TASK_NAME = {}
-TASK_ID_LIST = []
+TASK = {}
+
+
+class Task():
+    name : str
+    explanation : str
+    start_date : datetime.datetime
+
+    def __init__(self, name, explanation, start_date) -> None:
+        self.name = name
+        self.explanation = explanation
+        self.start_date = start_date
 
 
 class Stats():
@@ -108,7 +118,7 @@ def menuHTML(page, task_id):
     html = """
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
-                <a class="navbar-brand">Shuggle</a>
+                <a class="navbar-brand" href="/"><span style="color:#00a497">S</span>huggle</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -133,7 +143,7 @@ def menuHTML(page, task_id):
         </nav>
 
     """.format(
-        TASK_NAME[task_id],
+        TASK[task_id].name,
         " active\" aria-current=\"page\"" if page == Page.TASK else "\"",
         " active\" aria-current=\"page\"" if page == Page.BOARD else "\"",
         " active\" aria-current=\"page\"" if page == Page.LOG else "\"",
@@ -230,13 +240,31 @@ def get_pw(username):
 
 @app.route('/')
 def index():
-    # /boardにリダイレクト
-    return redirect(url_for('board'))
+    task_list = []
+    for i in range(1):
+        for key, value in TASK.items():
+            task_list.append(
+                {
+                    'id': key,
+                    'name': value.name,
+                    'explanation': value.explanation
+                }
+            )
+    
+    return render_template(f'index.html', task_list=task_list)
 
 
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static/img'), 'favicon.ico', )
+
+
+@app.route('/<task_id>/')
+def task_index(task_id):
+    if not task_id in TASK:
+        return redirect(url_for('index'))
+
+    return redirect(url_for('task', task_id=task_id))
 
 
 @app.route('/<task_id>/timestamp', methods=['GET'])
@@ -252,16 +280,16 @@ def get_timestamp(task_id):
 
 @app.route("/<task_id>/task")
 def task(task_id):
-    if not task_id in TASK_ID_LIST:
-        return # TODO:タスクが存在しないときのページへリダイレクト
+    if not task_id in TASK:
+        return redirect(url_for('index'))
 
-    return render_template(f'task/{task_id}.html', menu=menuHTML(Page.TASK, task_id), task_name=TASK_NAME[task_id])
+    return render_template(f'task/{task_id}.html', menu=menuHTML(Page.TASK, task_id), task_name=TASK[task_id].name)
 
 
 @app.route("/<task_id>/board")
 def board(task_id):
-    if not task_id in TASK_ID_LIST:
-        return # TODO:タスクが存在しないときのページへリダイレクト
+    if not task_id in TASK:
+        return redirect(url_for('index'))
     
     user_stats = GetUserStats(task_id)
 
@@ -277,13 +305,13 @@ def board(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('board.html', task_name=TASK_NAME[task_id], table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
 
 
 @app.route("/<task_id>/log")
 def log(task_id):
-    if not task_id in TASK_ID_LIST:
-        return # TODO:タスクが存在しないときのページへリダイレクト
+    if not task_id in TASK:
+        return redirect(url_for('index'))
     
     user_stats = GetUserStats(task_id)
 
@@ -300,7 +328,7 @@ def log(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_name=TASK_NAME[task_id], table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
 
 
 def allowed_file(filename):
@@ -309,8 +337,8 @@ def allowed_file(filename):
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
 def upload_file(task_id):
-    if not task_id in TASK_ID_LIST:
-        return # TODO:タスクが存在しないときのページへリダイレクト
+    if not task_id in TASK:
+        return redirect(url_for('index'))
     
     msg = ""
 
@@ -341,14 +369,14 @@ def upload_file(task_id):
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = GetUserNames(task_id)
 
-    return render_template('upload.html', task_id=task_id, task_name=TASK_NAME[task_id], message=msg, username=user_name_list, menu=menuHTML(Page.UPLOAD, task_id))
+    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, username=user_name_list, menu=menuHTML(Page.UPLOAD, task_id))
   
 
 @app.route('/<task_id>/admin')
 @auth.login_required
 def admin(task_id):
-    if not task_id in TASK_ID_LIST:
-        return # TODO:タスクが存在しないときのページへリダイレクト
+    if not task_id in TASK:
+        return redirect(url_for('index'))
     
     user_stats = GetUserStats(task_id)
 
@@ -365,7 +393,7 @@ def admin(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_id=task_id, task_name=TASK_NAME[task_id], table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id), inproc_text=Markup(inproc_text), num_col=num_col)
+    return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id), inproc_text=Markup(inproc_text), num_col=num_col)
 
 
 if __name__ == "__main__":
@@ -377,12 +405,14 @@ if __name__ == "__main__":
 
         try:
             # タスク名を取得
-            with open(os.path.join(dir, "task_name.txt"), "r", encoding='shift_jis') as f:
+            with open(os.path.join(dir, "task_name.txt"), "r", encoding='utf-8') as f:
                 task_name = f.readline()
+                task_explanation = f.readline()
+                date = f.readline()
+                start_date = datetime.datetime.strptime(date, '%Y-%m-%d')
 
-            print(f"found task: ({task_id}) {task_name}")
-            TASK_ID_LIST.append(task_id)
-            TASK_NAME[task_id] = task_name
+            print(f"found task: ({task_id}) {task_name} {task_explanation}")
+            TASK[task_id] = Task(task_name, task_explanation, start_date)
         except:
             continue
 

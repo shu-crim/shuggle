@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shuggle</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
+
+        <script>
+        </script>
+    
+    </head>
+    <body>
+        <div class="container col-11">
+            <h1><span style="color:#00a497">S</span>huggle</h1>
+        </div>
+
+        <br>
+
+        <div class="container col-11">
+            <h3>開催中の<span style="color:#00a497">T</span>ask</h3>
+        </div>
+
+        <div class="container col-11">
+            <div class="row row-cols-auto">
+                {% for task in task_list %}
+                <div class="col">
+                <div class="card text-white bg-dark mb-3" style="width: 18rem;">
+                    <img src="/static/img/{{task.id}}.png" class="card-img-top">
+                    <div class="card-body">
+                        <p class="card-text">{{task.explanation}}</p>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/task">タスク説明</a></li>
+                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/board">評価結果</a></li>
+                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/upload">提出</a></li>
+                    </ul>
+                </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+    </body>
+</html>
