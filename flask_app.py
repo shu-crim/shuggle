@@ -341,7 +341,7 @@ def upload_file(task_id):
     # ディレクトリ名からユーザ名のlistを作成
     user_name_list = GetUserNames(task_id)
 
-    return render_template('upload.html', task_name=TASK_NAME[task_id], message=msg, username=user_name_list, menu=menuHTML(Page.UPLOAD, task_id))
+    return render_template('upload.html', task_id=task_id, task_name=TASK_NAME[task_id], message=msg, username=user_name_list, menu=menuHTML(Page.UPLOAD, task_id))
   
 
 @app.route('/<task_id>/admin')
