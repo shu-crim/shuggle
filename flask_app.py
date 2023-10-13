@@ -20,11 +20,13 @@ class Task():
     name : str
     explanation : str
     start_date : datetime.datetime
+    end_date : datetime.datetime
 
-    def __init__(self, name, explanation, start_date) -> None:
+    def __init__(self, name, explanation, start_date, end_date) -> None:
         self.name = name
         self.explanation = explanation
         self.start_date = start_date
+        self.end_date = end_date
 
 
 class Stats():
@@ -240,10 +242,20 @@ def get_pw(username):
 
 @app.route('/')
 def index():
-    task_list = []
-    for i in range(1):
-        for key, value in TASK.items():
-            task_list.append(
+    today = datetime.datetime.now()
+    task_list_open = []
+    task_list_closed = []
+    for key, value in TASK.items():
+        if value.start_date <= today and value.end_date > today:
+            task_list_open.append(
+                {
+                    'id': key,
+                    'name': value.name,
+                    'explanation': value.explanation
+                }
+            )
+        if value.end_date <= today:
+            task_list_closed.append(
                 {
                     'id': key,
                     'name': value.name,
@@ -251,7 +263,7 @@ def index():
                 }
             )
     
-    return render_template(f'index.html', task_list=task_list)
+    return render_template(f'index.html', task_list_open=task_list_open, task_list_closed=task_list_closed)
 
 
 @app.route('/favicon.ico')
@@ -406,13 +418,15 @@ if __name__ == "__main__":
         try:
             # タスク名を取得
             with open(os.path.join(dir, "task_name.txt"), "r", encoding='utf-8') as f:
-                task_name = f.readline()
-                task_explanation = f.readline()
-                date = f.readline()
+                task_name = f.readline().rstrip()
+                task_explanation = f.readline().rstrip()
+                date = f.readline().rstrip()
                 start_date = datetime.datetime.strptime(date, '%Y-%m-%d')
+                date = f.readline().rstrip()
+                end_date = datetime.datetime.strptime(date, '%Y-%m-%d')
 
             print(f"found task: ({task_id}) {task_name} {task_explanation}")
-            TASK[task_id] = Task(task_name, task_explanation, start_date)
+            TASK[task_id] = Task(task_name, task_explanation, start_date, end_date)
         except:
             continue
 
