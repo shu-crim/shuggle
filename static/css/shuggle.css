@@ -24,3 +24,12 @@ body {
     background-position: center right;
     border-bottom: #fff 3px solid;
 }
+
+h2 {
+    padding: 0.2rem 0;
+    margin-bottom: 1.0rem;
+    background-image: linear-gradient(90deg, #00a497 0 10%, #dedede 10%);
+    background-repeat: no-repeat;
+    background-size: 100% 5%;
+    background-position: bottom;
+}
