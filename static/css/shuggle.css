@@ -26,10 +26,14 @@ body {
 }
 
 h2 {
-    padding: 0.2rem 0;
-    margin-bottom: 1.0rem;
-    background-image: linear-gradient(90deg, #00a497 0 10%, #dedede 10%);
+    padding: 0.4rem 0;
+    margin-bottom: 1.5rem;
+    background-image: linear-gradient(90deg, #00a497 0 100%);
     background-repeat: no-repeat;
     background-size: 100% 5%;
     background-position: bottom;
+}
+
+.container li {
+    padding: 0.2rem 0;
 }
