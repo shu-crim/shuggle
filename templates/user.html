@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shuggle | Login</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+
+        <script>
+            $(document).ready(function() {
+                var user_id = "{{user_id}}";
+                var user_name = "{{user_name}}";
+                var user_key = "{{user_key}}";
+                var user_email = "{{user_email}}";
+                var next_url = "{{next_url}}";
+                var login = "{{login}}";
+
+                // ログインしてきたときはユーザ情報を保存して自動で飛ぶ
+                if (login == "true"){
+                    console.log(user_id);
+                    console.log(user_name);
+                    console.log(user_key);
+                    console.log(next_url);
+                    console.log(login);
+
+                    localStorage.setItem('user_id', user_id);
+                    localStorage.setItem('user_key', user_key);
+                    localStorage.setItem('user_name', user_name);
+                    localStorage.setItem('user_email', user_email);
+
+                    if (next_url != "") {
+                        window.location.href = next_url;
+                    }
+                    else {
+                        window.location.href = "/";
+                    }
+                    
+                    return;
+                }
+
+                // LocalStorageからデータ読み込み
+                var user_id = localStorage.getItem("user_id");
+                var user_name = localStorage.getItem("user_name");
+                var user_key = localStorage.getItem("user_key");
+
+                // データがなければログイン画面へ
+                if (user_id == null || user_name == null || user_key == null){
+                    window.location.href = "/login";
+                }
+
+                // ユーザ情報を照合
+                var request = new XMLHttpRequest()
+                request.open("GET", "/verify/" + user_id + "/" + user_key, true);
+                request.onreadystatechange = function() {
+                    if (request.readyState == 4 && request.status == 200) {
+                        //受信完了時の処理
+                        var verify = document.createTextNode(decodeURI(request.responseText));
+                        if (verify.data == "true") {
+                            // 照合に成功したらユーザ名を表示
+                            document.getElementById('user-name').textContent = user_name;
+                        } else {
+                            // 照合に失敗したらログイン画面へ
+                            window.location.href = "/login";
+                        }
+                    }
+                }
+                request.send("");
+            });
+
+            function logoutClick() {
+                // ログアウトする
+                localStorage.setItem('user_id', "");
+                localStorage.setItem('user_key', "");
+                localStorage.setItem('user_name', "");
+                localStorage.setItem('user_email', "");
+                window.location.href = "/login";
+            }
+
+        </script>
+    
+    </head>
+    <body>
+        <div class="container col-11">
+            <h1><a class="navbar-brand" href="/"><span style="color:#00a497">S</span>huggle</a></h1>
+        </div>
+
+        <br>
+
+        <div class="container col-11">
+            <div class="row">
+                <h2>ようこそ <span id="user-name">{{user_name}}</span> <span style="color:#00a497">さ</span>ん</h2>
+                <h3><a href="/" class="link-primary">Task一覧へ</a></h3>
+            </div>
+            <br>
+            <br>
+            <div class="row">
+                <div class="container col-10">
+                </div>
+                <div class="container col-2">
+                    <button onclick="logoutClick()" id="btn-logout" class="w-100 p-2 form-control-lg btn btn-outline-secondary">ログアウト</button>
+                </div>
+            </div>
+        </div>
+
+
+        <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
+    </body>
+</html>
