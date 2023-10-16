@@ -4,17 +4,19 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Shuggle</title>
-        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
-        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+        <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='css/shuggle.css')}}">
 
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery.tablesorter.min.js')}}"></script>
 
         <script>
         </script>
     
     </head>
     <body>
+        {{menu}}
+
         <div class="container col-11">
             <h1><span style="color:#00a497">S</span>huggle</h1>
             <h4>データ処理Task評価システム</h4>
@@ -37,9 +39,9 @@
                         <p class="card-text">{{task.explanation}}</p>
                     </div>
                     <ul class="list-group list-group-flush">
-                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/task">タスク説明</a></li>
-                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/board">評価結果</a></li>
-                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/upload">提出</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/task">タスク説明</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/board">評価結果</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/upload">提出</a></li>
                     </ul>
                 </div>
                 </div>
@@ -65,9 +67,9 @@
                         <p class="card-text">{{task.explanation}}</p>
                     </div>
                     <ul class="list-group list-group-flush">
-                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/task">タスク説明</a></li>
-                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/board">評価結果</a></li>
-                        <li class="list-group-item text-white bg-dark"><a href="/{{task.id}}/upload">提出</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/task">タスク説明</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/board">評価結果</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/upload">提出</a></li>
                     </ul>
                 </div>
                 </div>
@@ -76,6 +78,7 @@
         </div>
         {% endif %}
 
-        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
     </body>
 </html>

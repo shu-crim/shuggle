@@ -4,30 +4,50 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Shuggle | {{ task_name }}</title>
-        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
-        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+        <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='css/shuggle.css')}}">
 
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery.tablesorter.min.js')}}"></script>
 
         <script>
-            // ユーザを選択したときに選択を保存してページ読み込み時に復元
-            var key_user_select = "user_select"
-            var user_select = null;
-
             $(document).ready(function() {
+                div_user_name = document.getElementById('user-name');
                 user_select = document.getElementById('user-select');
-                user_select.onchange = selectChange;
+                input_user_id = document.getElementById('input-user-id');
+                input_user_key = document.getElementById('input-user-key');
 
-                var local_storage_user_select = localStorage.getItem(key_user_select);
-                if (local_storage_user_select != null) {
-                    user_select.value = local_storage_user_select;
+                // ユーザ情報が保存されていたら取得
+                var user_id = localStorage.getItem("user_id");
+                var user_key = localStorage.getItem("user_key");
+                var user_name = localStorage.getItem("user_name");
+
+                // ユーザ情報がなければログイン画面へ
+                if (user_id == null || user_name == null || user_key == null){
+                    console.log("user data not found")
+                    window.location.href = "/login";
                 }
-            });
 
-            function selectChange() {
-                localStorage.setItem(key_user_select, user_select.value);
-            }
+                // ユーザ情報を照合
+                var request = new XMLHttpRequest()
+                request.open("GET", "/verify/" + user_id + "/" + user_key, true);
+                request.onreadystatechange = function() {
+                    if (request.readyState == 4 && request.status == 200) {
+                        //受信完了時の処理
+                        var verify = document.createTextNode(decodeURI(request.responseText));
+                        if (verify.data == "true") {
+                            // 照合に成功したらユーザ名を表示
+                            div_user_name.textContent = user_name;
+                            input_user_id.value = user_id;
+                            input_user_key.value = user_key;
+                        } else {
+                            // 照合に失敗したらログイン画面へ
+                            window.location.href = "/login";
+                        }
+                    }
+                }
+                request.send("");                
+            });
         </script>
     
     </head>
@@ -46,27 +66,19 @@
 
         <div class="container col-11">
             <form action="" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="user_id" value="" id="input-user-id">
+                <input type="hidden" name="user_key" value="" id="input-user-key">
                 <div class="row">
                     <div class="col-12">
-                        <h5>1. ユーザ名を選択してください（匿名希望の方はanonymousを選択）：</h5>
+                        <h5>アップロードする.pyファイルを 選択/ドラッグ&ドロップ してアップロードボタンをクリックしてください：</h5>
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-2 d-flex align-items-end text-right justify-content-end d-flex align-items-center">
-                        ユーザ選択
+                        ユーザ名
                     </div>
-                    <div class="col-10">
-                        <select name="user" class="form-control-lg" id="user-select">
-                            {% for username in username %}
-                                <option value="{{ username }}">{{ username }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <br><br>
-                <div class="row">
-                    <div class="col-12">
-                        <h5>2. アップロードする.pyファイルを選択してアップロードボタンをクリックしてください：</h5>
+                    <div class="col-10" id="user-name" style="font-size:1.8rem;">
+                        <!-- ユーザ名を表示する -->
                     </div>
                 </div>
                 <div class="row">
@@ -93,7 +105,7 @@
         
         <br>
 
-        <div class="container col-11">
+        <div class="container col-11" style="font-size:1.5rem;">
             {{message}}
         </div>
         
@@ -137,6 +149,7 @@
 
         </div>
 
-        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
     </body>
 </html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shuggle | Login</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+
+        <script>
+        </script>
+    
+    </head>
+    <body>
+        <div class="container col-11">
+            <h1><a class="navbar-brand" href="/"><span style="color:#00a497">S</span>huggle</a></h1>
+        </div>
+
+        <br>
+
+        <div class="container col-4">
+            <form class="form-signin" method="POST">
+                <h1 class="h3 mb-3 font-weight-normal">Login</h1>
+                <h2 class="h5 mb-3 font-weight-normal">ログインすると提出できるようになります。</h2>
+                {% if message != "" %}
+                {{message}}<br><br>
+                {% endif  %}
+                <label for="inputEmail" class="sr-only">Email address</label>
+                <input type="email" name="inputEmail" class="form-control" placeholder="Email address" required autofocus>
+                <label for="inputPassword" class="sr-only">Password</label>
+                <input type="password" name="inputPassword" class="form-control" placeholder="Password" required>
+                <br>
+                <input type="hidden" name="nextUrl" value="/">
+                <input type="submit" value="Login" class="btn btn-lg btn-outline-info btn-block" id="buttonLogin">
+            </form>
+        </div>
+
+        <br>
+
+        <div class="container col-4">
+            これから始める方は...<br>
+            <a href="/join" class="link-info">アカウントを作成する</a>
+            <br><br>
+            それとも...<br>
+            <a href="/" class="link-info">アカウントを作成せず結果だけ閲覧する</a>
+        </div>
+
+        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+    </body>
+</html>

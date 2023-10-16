@@ -7,8 +7,8 @@
         <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
         <link rel="stylesheet" href="{{url_for('static', filename='css/shuggle.css')}}">
     
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.0/js/jquery.tablesorter.min.js"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery.tablesorter.min.js')}}"></script>
 
         <script>
             var num_col = Number("{{ num_col }}");
@@ -49,7 +49,8 @@
             {{table_log}}
         </div>
 
-        <script src="{{url_for('static', filename='js/table.js')}}"></script>
-        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/table.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
     </body>
 </html>
