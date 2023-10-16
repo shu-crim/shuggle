@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Shuggle | Login</title>
+        <title>Shuggle | User</title>
         <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
         <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
 
@@ -17,27 +17,32 @@
                 var user_email = "{{user_email}}";
                 var next_url = "{{next_url}}";
                 var login = "{{login}}";
+                var update_user_data = "{{update_user_data}}";
+                
+                // ユーザ情報を保存
+                if (update_user_data == "true") {
+                    if (user_id != "") {
+                        localStorage.setItem('user_id', user_id);
+                    }
+                    if (user_key != "") {
+                        localStorage.setItem('user_key', user_key);
+                    }
+                    if (user_name != "") {
+                        localStorage.setItem('user_name', user_name);
+                    }
+                    if (user_email != "") {
+                        localStorage.setItem('user_email', user_email);
+                    }
+                }
 
-                // ログインしてきたときはユーザ情報を保存して自動で飛ぶ
-                if (login == "true"){
-                    console.log(user_id);
-                    console.log(user_name);
-                    console.log(user_key);
-                    console.log(next_url);
-                    console.log(login);
-
-                    localStorage.setItem('user_id', user_id);
-                    localStorage.setItem('user_key', user_key);
-                    localStorage.setItem('user_name', user_name);
-                    localStorage.setItem('user_email', user_email);
-
+                // ログインしてきたときは自動で飛ぶ
+                if (login == "true") {
                     if (next_url != "") {
                         window.location.href = next_url;
                     }
                     else {
                         window.location.href = "/";
-                    }
-                    
+                    }                    
                     return;
                 }
 
@@ -61,6 +66,8 @@
                         if (verify.data == "true") {
                             // 照合に成功したらユーザ名を表示
                             document.getElementById('user-name').textContent = user_name;
+                            document.getElementById('input-user-id').value = user_id;
+                            document.getElementById('input-user-key').value = user_key;
                         } else {
                             // 照合に失敗したらログイン画面へ
                             window.location.href = "/login";
@@ -79,6 +86,14 @@
                 window.location.href = "/login";
             }
 
+            function visibleChangeName() {
+                div_change_name = document.getElementById('div-change-name');
+                if (div_change_name.style.visibility == 'visible') {
+                    div_change_name.style.visibility = 'hidden';
+                } else {
+                    div_change_name.style.visibility = 'visible';
+                }
+            }
         </script>
     
     </head>
@@ -92,7 +107,34 @@
         <div class="container col-11">
             <div class="row">
                 <h2>ようこそ <span id="user-name">{{user_name}}</span> <span style="color:#00a497">さ</span>ん</h2>
-                <h3><a href="/" class="link-primary">Task一覧へ</a></h3>
+            </div>
+            <div class="row">
+                <div class="container col-2">
+                    <a href="/"><button id="btn-root" class="w-100 p-2 form-control-lg btn btn-outline-info">Task一覧へ</button></a>
+                </div>
+                <div class="container col-10">
+                </div>
+            </div>
+            <br>
+            <div class="row">
+                <div class="container col-2">
+                    <button onclick="visibleChangeName()" id="btn-change-name" class="w-100 p-2 form-control-lg btn btn-outline-info">ユーザ名の変更</button>
+                </div>
+                <div class="container col-5">
+                    <div id="div-change-name" style="visibility: hidden;">
+                        <form method="POST">
+                            <div class="input-group mb-3">
+                                <input type="text" name="newName" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" class="form-control" placeholder="新しい表示ユーザ名" aria-describedby="button-addon2">
+                                <input type="submit" value="変更" class="btn btn-outline-info" type="button" id="button-addon2">
+                                <input type="hidden" name="userID" id="input-user-id" value="">
+                                <input type="hidden" name="userKey" id="input-user-key" value="">
+                            </div>
+                        </form>
+                        使える文字：半角英数、記号「_.-」
+                    </div>
+                </div>
+                <div class="container col-5">
+                </div>
             </div>
             <br>
             <br>

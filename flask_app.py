@@ -494,14 +494,29 @@ def login():
         # キーを保存
         UpdateUsersCsv(USER_CSV_PATH, user_data.id, 'key', user_key)
 
-        return render_template(f'user.html', user_email=email, user_id=user_data.id, user_key=user_key, user_name=user_data.name, next_url=next_url, login="true")
+        return render_template(f'user.html', user_email=email, user_id=user_data.id, user_key=user_key, user_name=user_data.name, next_url=next_url, login="true", update_user_data="true")
 
 
-@app.route('/user/info')
+@app.route('/user/info', methods=['GET', 'POST'])
 def user():
+    if request.method == 'GET':
+        return render_template(f'user.html', login="false")
 
-    return render_template(f'user.html', login="false")
-
+    elif request.method == 'POST':
+        try:
+            new_name = request.form['newName']
+            user_id = request.form['userID']
+            user_key = request.form['userKey']
+            verified = VerifyIdAndKey(user_id, user_key)
+            if verified:
+                # 名前を変更
+                success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'name', new_name)
+                if not success:
+                    raise(ValueError())
+        except:
+            return render_template(f'user.html')
+        
+        return render_template(f'user.html', user_name=new_name, update_user_data="true")
 
 @app.route('/verify/<user_id>/<user_key>', methods=['GET'])
 def verify(user_id, user_key):
