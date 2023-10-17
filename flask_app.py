@@ -504,19 +504,44 @@ def user():
 
     elif request.method == 'POST':
         try:
-            new_name = request.form['newName']
             user_id = request.form['userID']
             user_key = request.form['userKey']
             verified, user_data = VerifyIdAndKey(user_id, user_key)
-            if verified:
+            if not verified:
+                raise(ValueError())
+        except:
+            return render_template(f'user.html', message='ユーザ認証に失敗しました。')
+        
+        new_name = ''
+        message = ''
+        try:
+            if 'buttonChangeName' in request.form:
                 # 名前を変更
+                new_name = request.form['newName']
                 success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'name', new_name)
                 if not success:
+                    message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
+                message = 'ユーザ名を変更しました。'
+            elif 'buttonChangePassword' in request.form:
+                # パスワードを変更
+                password = request.form['inputPassword']
+                password_verify = request.form['inputPasswordVerify']
+                # 2つのパスワード入力の一致チェック
+                if password != password_verify:
+                    message = '再入力したパスワードが一致していません。'
+                    raise(ValueError())
+                # パスワードをハッシュ化
+                pass_hash = generate_password_hash(password, salt_length=21)
+                success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'pass_hash', pass_hash)
+                if not success:
+                    message = 'ユーザ情報の更新に失敗しました。'
+                    raise(ValueError())
+                message = 'パスワードを変更しました。'
         except:
-            return render_template(f'user.html')
-        
-        return render_template(f'user.html', user_name=new_name, update_user_data="true")
+            return render_template(f'user.html', message=message)
+
+        return render_template(f'user.html', user_name=new_name, update_user_data="true", message=message)
 
 @app.route('/verify/<user_id>/<user_key>', methods=['GET'])
 def verify(user_id, user_key):

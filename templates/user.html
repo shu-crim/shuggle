@@ -68,6 +68,8 @@
                             document.getElementById('user-name').textContent = user_name;
                             document.getElementById('input-user-id').value = user_id;
                             document.getElementById('input-user-key').value = user_key;
+                            document.getElementById('input-pass-user-id').value = user_id;
+                            document.getElementById('input-pass-user-key').value = user_key;
                         } else {
                             // 照合に失敗したらログイン画面へ
                             window.location.href = "/login";
@@ -92,6 +94,17 @@
                     div_change_name.style.visibility = 'hidden';
                 } else {
                     div_change_name.style.visibility = 'visible';
+                    div_change_password.style.visibility = 'hidden';
+                }
+            }
+            
+            function visibleChangePassword() {
+                div_change_password = document.getElementById('div-change-password');
+                if (div_change_password.style.visibility == 'visible') {
+                    div_change_password.style.visibility = 'hidden';
+                } else {
+                    div_change_password.style.visibility = 'visible';
+                    div_change_name.style.visibility = 'hidden';
                 }
             }
         </script>
@@ -108,6 +121,12 @@
             <div class="row">
                 <h2>ようこそ <span id="user-name">{{user_name}}</span> <span style="color:#00a497">さ</span>ん</h2>
             </div>
+            {% if message != "" %}
+            <div class="row">
+                {{message}}
+            </div>
+            <br>
+            {% endif %}
             <div class="row">
                 <div class="container col-2">
                     <a href="/"><button id="btn-root" class="w-100 p-2 form-control-lg btn btn-outline-info">Task一覧へ</button></a>
@@ -115,7 +134,10 @@
                 <div class="container col-10">
                 </div>
             </div>
+
             <br>
+
+            <!-- ユーザ名変更 -->
             <div class="row">
                 <div class="container col-2">
                     <button onclick="visibleChangeName()" id="btn-change-name" class="w-100 p-2 form-control-lg btn btn-outline-info">ユーザ名の変更</button>
@@ -125,7 +147,7 @@
                         <form method="POST">
                             <div class="input-group mb-3">
                                 <input type="text" name="newName" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" class="form-control" placeholder="新しい表示ユーザ名" aria-describedby="button-addon2">
-                                <input type="submit" value="変更" class="btn btn-outline-info" type="button" id="button-addon2">
+                                <input type="submit" name="buttonChangeName" value="変更" class="btn btn-outline-info" type="button" id="button-addon2">
                                 <input type="hidden" name="userID" id="input-user-id" value="">
                                 <input type="hidden" name="userKey" id="input-user-key" value="">
                             </div>
@@ -136,6 +158,30 @@
                 <div class="container col-5">
                 </div>
             </div>
+
+            <!-- パスワード変更 -->
+            <div class="row">
+                <div class="container col-2">
+                    <button onclick="visibleChangePassword()" id="btn-change-password" class="w-100 p-2 form-control-lg btn btn-outline-info">パスワードの変更</button>
+                </div>
+                <div class="container col-5">
+                    <div id="div-change-password" style="visibility: hidden;">
+                        <form class="form-signin" method="POST">
+                            <label for="inputPassword" class="sr-only">新しいPassword</label>
+                            <input type="password" name="inputPassword" class="form-control" placeholder="Password" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" required>
+                            <label for="inputPasswordVerify" class="sr-only">新しいPassword(もう一度)</label>
+                            <input type="password" name="inputPasswordVerify" class="form-control" placeholder="Password" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" required>
+                            使える文字：半角英数、記号「_.-」<br>
+                            <input type="submit" name="buttonChangePassword" value="変更" class="btn btn-outline-info" type="button" style="margin-top:1rem;">
+                            <input type="hidden" name="userID" id="input-pass-user-id" value="">
+                            <input type="hidden" name="userKey" id="input-pass-user-key" value="">
+                        </form>
+                    </div>
+                </div>
+                <div class="container col-5">
+                </div>
+            </div>
+
             <br>
             <br>
             <div class="row">

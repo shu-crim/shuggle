@@ -29,12 +29,13 @@
                 <input type="email" name="inputEmail" class="form-control" placeholder="Email address" required autofocus>
                 <br>
                 <label for="inputPassword" class="sr-only">Password</label>
-                <input type="password" name="inputPassword" class="form-control" placeholder="Password" required>
+                <input type="password" name="inputPassword" class="form-control" placeholder="Password" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" required>
                 <label for="inputPasswordVerify" class="sr-only">Password(もう一度)</label>
-                <input type="password" name="inputPasswordVerify" class="form-control" placeholder="Password" required>
+                <input type="password" name="inputPasswordVerify" class="form-control" placeholder="Password" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" required>
                 <br>
+                使える文字：半角英数、記号「_.-」<br>
                 <input type="hidden" name="nextUrl" value="/user/info">
-                <input type="submit" value="Create Account" class="btn btn-lg btn-outline-info btn-block" id="buttonSignin">
+                <input type="submit" value="Create Account" class="btn btn-lg btn-outline-info btn-block" id="buttonSignin" style="margin-top:1rem;">
             </form>
         </div>
 
