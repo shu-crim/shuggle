@@ -88,10 +88,12 @@ def ReadUsersCsv(path:str):
                 line = f.readline()
                 if not line:
                     break
+                if len(line.rstrip().split(',')) != 5:
+                    continue
                 email, id, name, key, pass_hash = line.rstrip().split(',')
                 users[id] = UserData(id, email, pass_hash, name, key)
     except:
-        return None
+        return {}
 
     return users
 
@@ -505,7 +507,7 @@ def user():
             new_name = request.form['newName']
             user_id = request.form['userID']
             user_key = request.form['userKey']
-            verified = VerifyIdAndKey(user_id, user_key)
+            verified, user_data = VerifyIdAndKey(user_id, user_key)
             if verified:
                 # 名前を変更
                 success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'name', new_name)
@@ -521,7 +523,7 @@ def verify(user_id, user_key):
     verified = False
     
     try:
-        verified = VerifyIdAndKey(user_id, user_key)
+        verified, user_data = VerifyIdAndKey(user_id, user_key)
     except:
         verified = False
 
@@ -620,7 +622,7 @@ def upload_file(task_id):
             user_id = request.form['user_id']
             user_key = request.form['user_key']
             
-            verified = VerifyIdAndKey(user_id, user_key)
+            verified, user_data = VerifyIdAndKey(user_id, user_key)
             if not verified:
                 msg = "ユーザ認証に失敗しました。"
             else:
