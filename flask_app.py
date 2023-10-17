@@ -179,7 +179,7 @@ def GetUserStats(task_id) -> {}:
         user_name = users[user_id].name
         stats[user_name] = []
         
-        with open(file_path, "r", encoding='shift_jis') as csv_file:
+        with open(file_path, "r", encoding='utf-8') as csv_file:
             line = csv_file.readline() # ヘッダ読み飛ばし
             while True:
                 line = csv_file.readline()
@@ -345,11 +345,10 @@ def VerifyEmailAndPassword(email, password):
     
     # 認証を行う
     verified = False
-    user_data = UserData()
     for id, user_data in users.items():
         if user_data.email == email:
-            hash = HASH_METHOD + "$" + user_data.pass_hash.replace('-', '$')
-            if check_password_hash(hash, password):
+            pass_hash = user_data.pass_hash
+            if check_password_hash(pass_hash, password):
                 verified = True
             break
     
@@ -454,8 +453,7 @@ def join():
             return render_template(f'join.html', message="IDを発行できませんでした。")
         
         # パスワードをハッシュ化
-        hash = generate_password_hash(password, salt_length=21)
-        pass_hash = hash.split('$')[1] + "-" + hash.split('$')[2]
+        pass_hash = generate_password_hash(password, salt_length=21)
         
         # 本人確認用のキーを作成
         user_key = str(uuid.uuid4()).split('-')[0]
@@ -467,7 +465,7 @@ def join():
         if not success:
             return render_template(f'join.html', message="ユーザ情報を登録できませんでした。")
 
-        return render_template(f'user.html', user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true")
+        return render_template(f'user.html', user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
 
 
 @app.route('/login', methods=['GET', 'POST'])
