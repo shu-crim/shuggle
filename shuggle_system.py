@@ -195,7 +195,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
-        with open(os.path.join(OUTPUT_DIR, task_id, "detail", output_csv_filename), "w", encoding='shift_jis') as output_csv_file:
+        with open(os.path.join(OUTPUT_DIR, task_id, "detail", output_csv_filename), "w", encoding='utf-8') as output_csv_file:
             # 集計
             output_csv_file.write(f"filename,{os.path.basename(new_filename)}\n\n")
             output_csv_file.write("type,num_data,true,false,accuracy\n")
@@ -214,13 +214,13 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     csv_path = os.path.join(OUTPUT_DIR, task_id, "user", user_name + ".csv")
     if not os.path.exists(csv_path):
         # ファイルが無いのでヘッダを付ける
-        with open(csv_path, "w", encoding='shift_jis') as output_csv_file:
+        with open(csv_path, "w", encoding='utf-8') as output_csv_file:
             output_csv_file.write("date,time,filename,")
             for data_type in DataType:
                 output_csv_file.write(f"{data_type.name}_true,{data_type.name}_false,{data_type.name}_accuracy,")
             output_csv_file.write("message,memo")
 
-    with open(csv_path, "a", encoding='shift_jis') as output_csv_file:
+    with open(csv_path, "a", encoding='utf-8') as output_csv_file:
         output_csv_file.write('\n') # 各結果の最初に改行を入れる。前の不正終了を引きずらないため
         output_csv_file.write(now.strftime('%Y/%m/%d,%H:%M:%S,'))                    
         output_csv_file.write(os.path.basename(new_filename) + ",")
@@ -290,7 +290,7 @@ def main():
                     print(f"{path} -> {new_filename}")
 
                     # 評価中であることを示すファイルを生成
-                    with open(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_name}_inproc"), "w", encoding='shift_jis') as f:
+                    with open(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_name}_inproc"), "w", encoding='utf-8') as f:
                         pass
 
                     # タイムスタンプ更新
