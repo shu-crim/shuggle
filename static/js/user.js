@@ -25,7 +25,7 @@ $(document).ready(function() {
             if (verify.data == "true") {
                 // 照合に成功したらユーザ名を表示
                 if (id_user_name != null) {
-                    id_user_name.textContent = user_name;
+                    id_user_name.textContent = user_name + " さんのユーザページ";
                 }
             } else {
                 id_user_name.textContent = "ログイン";
