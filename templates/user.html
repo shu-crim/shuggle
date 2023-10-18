@@ -50,9 +50,10 @@
                 var user_id = localStorage.getItem("user_id");
                 var user_name = localStorage.getItem("user_name");
                 var user_key = localStorage.getItem("user_key");
+                var user_email = localStorage.getItem("user_email");
 
                 // データがなければログイン画面へ
-                if (user_id == null || user_name == null || user_key == null){
+                if (user_id == null || user_name == null || user_key == null || user_email == null){
                     window.location.href = "/login";
                 }
 
@@ -66,6 +67,8 @@
                         if (verify.data == "true") {
                             // 照合に成功したらユーザ名を表示
                             document.getElementById('user-name').textContent = user_name;
+                            document.getElementById('user-info-name').textContent = user_name;
+                            document.getElementById('user-info-email').textContent = user_email;
                             document.getElementById('input-user-id').value = user_id;
                             document.getElementById('input-user-key').value = user_key;
                             document.getElementById('input-pass-user-id').value = user_id;
@@ -125,8 +128,29 @@
             <div class="row">
                 {{message}}
             </div>
-            <br>
             {% endif %}
+
+            <!-- ユーザ情報表示 -->
+            <div class="row">
+                <div class="container col-2">
+                    <button class="w-100 p-2 btn btn-outline-light" style="pointer-events: none;">Email address</button>
+                </div>
+                <div class="container col-10 d-flex align-items-center" id="user-info-email">
+                </div>
+            </div>
+            <br>
+            <div class="row">
+                <div class="container col-2">
+                    <button class="w-100 p-2 btn btn-outline-light" style="pointer-events: none;">ユーザ名</button>
+                </div>
+                <div class="container col-10 d-flex align-items-center" id="user-info-name">
+                </div>
+            </div>
+            <br>
+            <br>
+            
+            
+            <!-- Task一覧へのリンク -->
             <div class="row">
                 <div class="container col-2">
                     <a href="/"><button id="btn-root" class="w-100 p-2 form-control-lg btn btn-outline-info">Task一覧へ</button></a>
