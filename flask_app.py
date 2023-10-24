@@ -429,6 +429,7 @@ def index():
     today = datetime.datetime.now()
     task_list_open = []
     task_list_closed = []
+    task_list_prepare = []
     for key, value in TASK.items():
         if value.start_date <= today and value.end_date > today:
             task_list_open.append(
@@ -446,8 +447,17 @@ def index():
                     'explanation': value.explanation
                 }
             )
+        if value.start_date > today:
+            task_list_prepare.append(
+                {
+                    'id': key,
+                    'name': value.name,
+                    'explanation': value.explanation
+                }
+            )
+
     
-    return render_template(f'index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, menu=menuHTML(Page.HOME))
+    return render_template(f'index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_prepare=task_list_prepare, menu=menuHTML(Page.HOME))
 
 
 @app.route('/favicon.ico')
