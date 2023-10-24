@@ -11,6 +11,8 @@ from enum import Enum
 from multiprocessing import Pool, TimeoutError
 import traceback
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+import json
+from task import Task
 
 
 NUM_CLASS = 5
@@ -21,6 +23,8 @@ INPUT_DATA_DIR =r"./input_data"
 CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
 TIMESTAMP_FILE_NAME = r"timestamp.txt"
 PROC_TIMEOUT_SEC = 1
+FILENAME_TASK_JSON = r"task.json"
+FILENAME_DATASET_JSON = r"dataset.json"
 
 
 def UpdateTtimestamp(task_id):
@@ -28,55 +32,66 @@ def UpdateTtimestamp(task_id):
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
-def read_dataset(path_csv):
-    with open(path_csv, "r") as csv_file:
-        filename_list = []
-        input_data_list = [] #入力データ
-        correct_list = [] #正解値
-        while True:
-            line = csv_file.readline()
-            if not line:
-                break
+def read_dataset(path_json, answer_value_type=int, multi_data=False, data_type="image-3ch"):
+    json_open = open(path_json, 'r')
+    dataset = json.load(json_open)
 
-            try:
-                filename, label = line.rstrip(os.linesep).split(",") # 画像ファイル名, 正解値
-                correct_label = int(label)
+    filename_list = []
+    input_data_list = [] #入力データ
+    correct_list = [] #正解値
+    num_problem = 0
 
+    for item in dataset["data"]:
+        try:
+            # 正解値
+            correct_list.append(answer_value_type(item["gt"]))
+
+            # 入力データ
+            data = []
+            filename = []
+            if multi_data:
+                for path in item["path"]:
+                    # 画像読み込み
+                    filename.append(path)
+                    data.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), path))))
+            else:
                 # 画像読み込み
-                input_data_list.append(np.array(Image.open(os.path.join(os.path.dirname(path_csv), filename))))
-                correct_list.append(correct_label) # 画像を読み込めたらラベルも追加
-                filename_list.append(filename)
-            except:
-                print(f"{filename}の読み込みに失敗しました。")
-                continue
+                filename = item["path"]
+                data.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), item["path"]))))
 
-    # リストをnumpyに変換
-    correct_list = np.array(correct_list, dtype=int)
+            input_data = np.array(data, dtype=data[0].dtype)
+            input_data_list.append(input_data)
+            filename_list.append(filename)
 
-    return filename_list, input_data_list, correct_list
+            num_problem += 1
+        except:
+            print(f"入力データ({num_problem})の読み込みに失敗しました。")
+            continue
+
+    # 正解値リストをnumpyに変換
+    correct_list = np.array(correct_list, dtype=answer_value_type)
+
+    return num_problem, filename_list, input_data_list, correct_list
 
 
-def evaluate(path_csv, func_recognition):
-    # データ読み込み
-    filename_list, input_data_list, correct_list = read_dataset(path_csv)
-
-    # 正解データ数
-    num_test = len(input_data_list)
-
+def evaluate(num_problem, input_data_list, func_recognition, answer_value_type):
     total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
-        answer_list = np.zeros((num_test), int)
+        answer_list = np.zeros((num_problem), int)
         with Pool(processes=1) as p:
-            for i in range(num_test):
+            for i in range(num_problem):
                 time_limit = PROC_TIMEOUT_SEC * 20 if i == 0 else PROC_TIMEOUT_SEC # 初回のみオーバーヘッドを考慮してゆるめ
 
                 start_time = time.time()
                 apply_result = p.apply_async(func_recognition, (input_data_list[i],))
                 answer = apply_result.get(timeout=time_limit)
 
-                if type(answer) is not int:
-                    raise(ValueError("推定処理の返り値がint型ではありません。"))
+                # 返り値の型を矯正
+                answer = answer_value_type(answer)
+                if type(answer) is not answer_value_type:
+                    print(f"Type error answer:{type(answer)} answer_value_type:{answer_value_type}")
+                    raise(ValueError("推定処理の返り値の型が適切ではありません。"))
                 
                 end_time = time.time()
                 total_proc_time += end_time - start_time
@@ -91,17 +106,11 @@ def evaluate(path_csv, func_recognition):
     except Exception as e:
         raise(e)
     
-    return num_test, filename_list, correct_list, answer_list, total_proc_time
-
-
-class DataType(Enum):
-    train = 1
-    valid = 2
-    test = 3
+    return answer_list, total_proc_time
 
 
 class Result:
-    data_type = DataType.train
+    data_type = Task.DataType.train
     filename = ""
     correct = 0
     answer = 0
@@ -111,9 +120,9 @@ class Result:
         self.filename = filename
         self.correct = correct
         self.answer = answer
+    
 
-
-def evaluate3data(task_id, module_name, user_name):
+def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_data=False, data_type="image-3ch"):
     try:
         # ユーザ作成の処理を読み込む
         user_module = importlib.import_module(f"{USER_MODULE_DIR_NAME}.{task_id}.{module_name}")
@@ -133,29 +142,38 @@ def evaluate3data(task_id, module_name, user_name):
 
     try:    
         # train
-        num_train, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_DIR, task_id, "train", CORRECT_ANSWER_CSV_FILENAME), func_recognition)
+        num_train, filename_list, input_data_list, correct_list = read_dataset(
+            os.path.join(INPUT_DATA_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+
+        answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type)
         if num_train == 0:
             return []
         for i in range(num_train):
-            result = Result(DataType.train, filename_list[i], correct_list[i], answer_list[i])
+            result = Result(Task.DataType.train, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
         print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, totla: {total_proc_time : .1f} s')
 
         # valid
-        num_valid, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_DIR, task_id, "valid", CORRECT_ANSWER_CSV_FILENAME), func_recognition)
+        num_valid, filename_list, input_data_list, correct_list = read_dataset(
+            os.path.join(INPUT_DATA_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+        
+        answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type)
         if num_valid == 0:
             return []
         for i in range(num_valid):
-            result = Result(DataType.valid, filename_list[i], correct_list[i], answer_list[i])
+            result = Result(Task.DataType.valid, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
         print(f'Valiid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
 
         # test
-        num_test, filename_list, correct_list, answer_list, total_proc_time = evaluate(os.path.join(INPUT_DATA_DIR, task_id, "test", CORRECT_ANSWER_CSV_FILENAME), func_recognition)
+        num_test, filename_list, input_data_list, correct_list = read_dataset(
+            os.path.join(INPUT_DATA_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+       
+        answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type)
         if num_test == 0:
             return []
         for i in range(num_test):
-            result = Result(DataType.test, filename_list[i], correct_list[i], answer_list[i])
+            result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
         print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, totla: {total_proc_time : .1f} s')
 
@@ -168,11 +186,22 @@ def evaluate3data(task_id, module_name, user_name):
 
 
 def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
+    # タスク情報の読み込み
+    task:Task = Task(task_id)
+    if task is None:
+        print("タスク情報を読み込めません: {task_id}")
+        return
+
     # 処理と評価を実行
     proc_success = False
     message = ''
     try:
-        result_list = evaluate3data(task_id, os.path.splitext(new_filename)[0], user_name) # 拡張子を除く
+        if task.answer_value_type == Task.AnswerValueType.integer:
+            answer_value_type = int
+        elif task.answer_value_type == Task.AnswerValueType.real:
+            answer_value_type = float
+
+        result_list = evaluate3data(task_id, os.path.splitext(new_filename)[0], user_name, answer_value_type, task.multi_input_data, task.input_data_type) # 拡張子を除く
         proc_success = True
     except Exception as e:
         proc_success = False
@@ -181,34 +210,52 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
     if proc_success:
         # 評価結果を集計
-        num_true = {}
-        num_false = {}
-        for data_type in DataType:
-            num_true[data_type] = 0
-            num_false[data_type] = 0
+        if task.metric == Task.Metric.Accuracy:
+            num_true = {}
+            num_false = {}
+            for data_type in Task.DataType:
+                num_true[data_type] = 0
+                num_false[data_type] = 0
 
-        for result in result_list:
-            if result.correct == result.answer:
-                num_true[result.data_type] += 1
-            else:
-                num_false[result.data_type] += 1
+            for result in result_list:
+                if result.correct == result.answer:
+                    num_true[result.data_type] += 1
+                else:
+                    num_false[result.data_type] += 1
+        elif task.metric == Task.Metric.MAE:
+            abs_errors = {}
+            for result in result_list:
+                if not result.data_type in abs_errors:
+                    abs_errors[result.data_type] = []
+                abs_errors[result.data_type].append(np.abs(result.answer - result.correct))
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
         with open(os.path.join(OUTPUT_DIR, task_id, "detail", output_csv_filename), "w", encoding='utf-8') as output_csv_file:
             # 集計
             output_csv_file.write(f"filename,{os.path.basename(new_filename)}\n\n")
-            output_csv_file.write("type,num_data,true,false,accuracy\n")
-            for data_type in DataType:
-                num_data = num_true[data_type] + num_false[data_type]
-                output_csv_file.write(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}\n")
-                print(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}")
+            output_csv_file.write("type,num_data,{0}\n".format(
+                    "true,false,accuracy" if task.metric == Task.Metric.Accuracy else ("MAE" if task.metric == Task.Metric.MAE else "")
+                ))
+            for data_type in Task.DataType:
+                if task.metric == Task.Metric.Accuracy:
+                    num_data = num_true[data_type] + num_false[data_type]
+                    output_csv_file.write(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}\n")
+                    print(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}")
+                elif task.metric == Task.Metric.MAE:
+                    num_data = len(abs_errors[data_type])
+                    output_csv_file.write(f"{data_type.name},{num_data},{np.average(np.array(abs_errors[data_type], float))}\n")
 
             # 詳細
             output_csv_file.write("\n")
-            output_csv_file.write("type,filename,correct,answer,check\n")
-            for result in result_list:
-                output_csv_file.write(f"{result.data_type.name},{result.filename},{result.correct},{result.answer},{1 if result.correct == result.answer else 0}\n")
+            if task.metric == Task.Metric.Accuracy:
+                output_csv_file.write("type,filename,correct,answer,check\n")
+                for result in result_list:
+                    output_csv_file.write(f"{result.data_type.name},{result.filename.replace(',', '-')},{result.correct},{result.answer},{1 if result.correct == result.answer else 0}\n")
+            elif task.metric == Task.Metric.MAE:
+                output_csv_file.write("type,filename,correct,answer,abs_error\n")
+                for result in result_list:
+                    output_csv_file.write(f"{result.data_type.name},{str(result.filename).replace(',', '-')},{result.correct},{result.answer},{np.abs(result.answer - result.correct)}\n")
 
     # ユーザ毎の結果出力
     csv_path = os.path.join(OUTPUT_DIR, task_id, "user", user_name + ".csv")
@@ -216,20 +263,32 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
         # ファイルが無いのでヘッダを付ける
         with open(csv_path, "w", encoding='utf-8') as output_csv_file:
             output_csv_file.write("date,time,filename,")
-            for data_type in DataType:
-                output_csv_file.write(f"{data_type.name}_true,{data_type.name}_false,{data_type.name}_accuracy,")
+
+            for data_type in Task.DataType:
+                if task.metric == Task.Metric.Accuracy:
+                    output_csv_file.write(f"{data_type.name}_true,{data_type.name}_false,{data_type.name}_accuracy,")
+                elif task.metric == Task.Metric.MAE:
+                    output_csv_file.write(f"{data_type.name}_MAE,")
+
             output_csv_file.write("message,memo")
 
     with open(csv_path, "a", encoding='utf-8') as output_csv_file:
         output_csv_file.write('\n') # 各結果の最初に改行を入れる。前の不正終了を引きずらないため
         output_csv_file.write(now.strftime('%Y/%m/%d,%H:%M:%S,'))                    
         output_csv_file.write(os.path.basename(new_filename) + ",")
-        for data_type in DataType:
-            if proc_success:
-                num_data = num_true[data_type] + num_false[data_type]
-                output_csv_file.write(f"{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'},")
-            else:
-                output_csv_file.write(f"-,-,-,")
+        for data_type in Task.DataType:
+            if task.metric == Task.Metric.Accuracy:
+                if proc_success:
+                    num_data = num_true[data_type] + num_false[data_type]
+                    output_csv_file.write(f"{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'},")
+                else:
+                    output_csv_file.write(f"-,-,-,")
+            elif task.metric == Task.Metric.MAE:
+                if proc_success:
+                    num_data = len(abs_errors[data_type])
+                    output_csv_file.write(f"{np.average(np.array(abs_errors[data_type], float))},")
+                else:
+                    output_csv_file.write(f"-,")
 
         output_csv_file.write(f"{message},{memo}")
 
@@ -266,11 +325,16 @@ def main():
                     
                     path = py_files[0] # 最初に発見したファイルのみを対象とする
 
+                    # モジュール移動先が無ければ生成(新規Taskの実行時)
+                    dir_user_module = os.path.join("./", USER_MODULE_DIR_NAME, task_id)
+                    if not os.path.exists(dir_user_module):
+                        os.makedirs(dir_user_module)
+
                     # ファイル移動を試みる
                     now = datetime.datetime.now()
                     new_filename = user_name + "_" + task_id + "_" + now.strftime('%Y%m%d_%H%M%S_') + os.path.basename(path)
                     try:
-                        shutil.move(path, os.path.join("./", USER_MODULE_DIR_NAME, task_id, new_filename))
+                        shutil.move(path, os.path.join(dir_user_module, new_filename))
                     except:
                         continue
 
@@ -289,8 +353,17 @@ def main():
                     print(f"pcoccess start: {user_name}")
                     print(f"{path} -> {new_filename}")
 
+                    # 出力先ディレクトリが存在しない場合は生成(新規Taskの実行時)
+                    dir_output_user = os.path.join(OUTPUT_DIR, task_id, "user")
+                    if not os.path.exists(dir_output_user):
+                        os.makedirs(dir_output_user)
+
+                    dir_output_detail = os.path.join(OUTPUT_DIR, task_id, "detail")
+                    if not os.path.exists(dir_output_detail):
+                        os.makedirs(dir_output_detail)
+
                     # 評価中であることを示すファイルを生成
-                    with open(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_name}_inproc"), "w", encoding='utf-8') as f:
+                    with open(os.path.join(dir_output_user, f"{user_name}_inproc"), "w", encoding='utf-8') as f:
                         pass
 
                     # タイムスタンプ更新
