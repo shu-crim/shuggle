@@ -4,7 +4,7 @@ import datetime
 from enum import Enum
 import json
 
-TASK_DATA_DIR =r"./input_data"
+TASK_DATA_DIR =r"./tasks"
 FILENAME_TASK_JSON = r"task.json"
 
 

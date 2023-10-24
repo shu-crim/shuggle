@@ -19,7 +19,7 @@ NUM_CLASS = 5
 UPLOAD_DIR = r"./upload_dir"
 USER_MODULE_DIR_NAME = r"user_module"
 OUTPUT_DIR = r"./output"
-INPUT_DATA_DIR =r"./input_data"
+TASKS_DIR =r"./tasks"
 CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
 TIMESTAMP_FILE_NAME = r"timestamp.txt"
 PROC_TIMEOUT_SEC = 1
@@ -78,7 +78,7 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type):
     total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
-        answer_list = np.zeros((num_problem), int)
+        answer_list = np.zeros((num_problem), answer_value_type)
         with Pool(processes=1) as p:
             for i in range(num_problem):
                 time_limit = PROC_TIMEOUT_SEC * 20 if i == 0 else PROC_TIMEOUT_SEC # 初回のみオーバーヘッドを考慮してゆるめ
@@ -143,7 +143,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
     try:    
         # train
         num_train, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(INPUT_DATA_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(TASKS_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
 
         answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type)
         if num_train == 0:
@@ -155,7 +155,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
 
         # valid
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(INPUT_DATA_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
         answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type)
         if num_valid == 0:
@@ -167,7 +167,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
 
         # test
         num_test, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(INPUT_DATA_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
        
         answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type)
         if num_test == 0:

@@ -14,7 +14,7 @@ import shutil
 from task import Task
 
 
-INPUT_DATA_DIR = r"./input_data"
+TASKS_DIR = r"./tasks"
 OUTPUT_DIR = r"./output"
 UPLOAD_DIR_ROOT = r"./upload_dir"
 ALLOWED_EXTENSIONS = set(['py'])
@@ -757,7 +757,7 @@ def admin(task_id):
 
 if __name__ == "__main__":
     # タスク一覧を作成
-    dir_list = glob.glob(INPUT_DATA_DIR + '/**/')
+    dir_list = glob.glob(TASKS_DIR + '/**/')
     for dir in dir_list:
         # ディレクトリ名を取得→タスクIDとして使う
         task_id = os.path.basename(os.path.dirname(dir))

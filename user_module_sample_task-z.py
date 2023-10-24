@@ -5,7 +5,7 @@ from PIL import Image
 import cv2
 import json
 
-DIR_TASK = r"./input_data/task-z"
+DIR_TASK = r"./tasks/task-z"
 FILENAME_TASK_JSON = r"task.json"
 FILEPATH_INPUT_DATA_JSON = r"train/dataset.json"
 
@@ -73,7 +73,7 @@ def recognition(input_data) -> float:
 
 
     # floatで推定値を返す
-    return random.uniform(0, 2)
+    return np.random.uniform(0, 2)
 
 
 def main():
