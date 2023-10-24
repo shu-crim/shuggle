@@ -11,6 +11,8 @@ import datetime
 from enum import Enum
 import shutil
 
+from task import Task
+
 
 INPUT_DATA_DIR = r"./input_data"
 OUTPUT_DIR = r"./output"
@@ -19,6 +21,7 @@ ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
 USER_CSV_PATH = r"./data/users.csv"
 HASH_METHOD = "pbkdf2:sha256:260000"
+FILENAME_TASK_JSON = r"task.json"
 
 
 class UserData():
@@ -36,7 +39,7 @@ class UserData():
         self.key = key
 
 
-class Task():
+class TaskInfo():
     name : str
     explanation : str
     start_date : datetime.datetime
@@ -158,7 +161,7 @@ def UpdateUsersCsv(path:str, id:str, target:str, value:str) -> bool:
     return WriteUsersCsv(path, users)
 
 
-def GetUserStats(task_id) -> {}:
+def GetUserStats(task_id, metric:Task.Metric) -> {}:
     def TransIntIntFloat(true_false_accuracy : list):
         result = [0, 0, 0.0]
         try:
@@ -169,6 +172,13 @@ def GetUserStats(task_id) -> {}:
             return [0, 0, 0.0]
         return result
 
+    def TransFloat(num:str):
+        try:
+            result = float(num)
+        except:
+            return 0
+        return result
+    
     # ユーザ情報を読み込む
     users = ReadUsersCsv(USER_CSV_PATH)
 
@@ -189,17 +199,29 @@ def GetUserStats(task_id) -> {}:
                     break
 
                 raw = line.rstrip(os.linesep).split(",")
-                if len(raw) < 13:
-                    continue
+                if metric == Task.Metric.Accuracy:
+                    if len(raw) < 13:
+                        continue
+                elif metric == Task.Metric.MAE:
+                    if len(raw) < 6:
+                        continue
 
                 try:
                     dt = datetime.datetime.strptime(raw[0] + " " + raw[1], "%Y/%m/%d %H:%M:%S")
                     filename = raw[2]
-                    train = TransIntIntFloat(raw[3:6])
-                    valid = TransIntIntFloat(raw[6:9])
-                    test = TransIntIntFloat(raw[9:12])
-                    message = raw[12]
-                    memo = raw[13] if len(raw) >= 14 else ""
+
+                    if metric == Task.Metric.Accuracy:
+                        train = TransIntIntFloat(raw[3:6])
+                        valid = TransIntIntFloat(raw[6:9])
+                        test = TransIntIntFloat(raw[9:12])
+                        message = raw[12]
+                        memo = raw[13] if len(raw) >= 14 else ""
+                    elif metric == Task.Metric.MAE:
+                        train = TransFloat(raw[3])
+                        valid = TransFloat(raw[4])
+                        test = TransFloat(raw[5])
+                        message = raw[6]
+                        memo = raw[7] if len(raw) >= 8 else ""
 
                     # すべて読めたので保持
                     stats_read = Stats()
@@ -278,15 +300,29 @@ def menuHTML(page, task_id=""):
     return Markup(html)
 
 
-def CreateTableRow(stats, test=False, message=False, memo=False):
+def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=False):
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
     html_user += f'<td>{stats.datetime}</td>'
-    html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
-    html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
-    if test:
-        html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+
+    html_temp = ""
+    if metric == Task.Metric.Accuracy:
+        html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
+        html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
+        if test:
+            html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+    elif metric == Task.Metric.MAE:
+        try:
+            html_temp += f'<td>{stats.train:.3f}</td>'
+            html_temp += f'<td>{stats.valid:.3f}</td>'
+            if test:
+                html_temp += f'<td>{stats.test:.3f}</td>'
+        except:
+            html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
+
+    html_user += html_temp
+
     if memo:
         html_user += f'<td>{stats.memo}</td>'
     if message:
@@ -295,7 +331,15 @@ def CreateTableRow(stats, test=False, message=False, memo=False):
     return html_user
 
 
-def CreateTable(stats_list, test=False, message=False, memo=False):
+def CreateTable(stats_list, metric:Task.Metric, test=False, message=False, memo=False):
+    def metricName(metric: Task.Metric):
+        if metric == Task.Metric.Accuracy:
+            return '正解率'
+        elif metric == Task.Metric.MAE:
+            return '平均絶対誤差'
+        else:
+            return ''
+
     num_col = 0
     html_table = ""
     html_table += "<table class=\"table table-dark\" id=\"fav-table\">"
@@ -304,12 +348,12 @@ def CreateTable(stats_list, test=False, message=False, memo=False):
     num_col += 1
     html_table += f"<th id=\"th-{num_col}\">提出日時</th>"
     num_col += 1
-    html_table += f"<th id=\"th-{num_col}\">train(配布)正解率</th>"
+    html_table += f"<th id=\"th-{num_col}\">train(配布){metricName(metric)}</th>"
     num_col += 1
-    html_table += f"<th id=\"th-{num_col}\">valid正解率</th>"
+    html_table += f"<th id=\"th-{num_col}\">valid{metricName(metric)}</th>"
     num_col += 1
     if test:
-        html_table += f"<th id=\"th-{num_col}\">test正解率</th>"
+        html_table += f"<th id=\"th-{num_col}\">test{metricName(metric)}</th>"
         num_col += 1
     if memo:
         html_table += f"<th id=\"th-{num_col}\">メモ</th>"
@@ -321,7 +365,7 @@ def CreateTable(stats_list, test=False, message=False, memo=False):
     html_table += "<tbody>"
 
     for stats in stats_list:
-        html_table += CreateTableRow(stats, test=test, message=message, memo=memo)
+        html_table += CreateTableRow(stats, metric, test=test, message=message, memo=memo)
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -543,6 +587,7 @@ def user():
 
         return render_template(f'user.html', user_name=new_name, update_user_data="true", message=message)
 
+
 @app.route('/verify/<user_id>/<user_key>', methods=['GET'])
 def verify(user_id, user_key):
     verified = False
@@ -587,7 +632,11 @@ def board(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
     
-    user_stats = GetUserStats(task_id)
+    # タスク情報を読み込む
+    task:Task = Task(task_id)
+
+    # ユーザ成績を読み込む
+    user_stats = GetUserStats(task_id, task.metric)
 
     # 辞書をリスト化してソート
     latest_stats_list = []
@@ -596,7 +645,7 @@ def board(task_id):
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, memo=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, memo=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -609,7 +658,11 @@ def log(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
     
-    user_stats = GetUserStats(task_id)
+    # タスク情報を読み込む
+    task:Task = Task(task_id)
+
+    # ユーザ成績を読み込む
+    user_stats = GetUserStats(task_id, task.metric)
 
     # 辞書をリスト化してソート
     stats_list = []
@@ -619,7 +672,7 @@ def log(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, message=True, memo=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, message=True, memo=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -654,9 +707,9 @@ def upload_file(task_id):
                 try:
                     save_dir = os.path.join(UPLOAD_DIR_ROOT, task_id, user_id)
 
-                    # まだディレクトリが存在しなければ作成
+                    # まだディレクトリが存在しなければ作成(Taskのディレクトリがなければそれも生成)
                     if not os.path.exists(save_dir):
-                        os.mkdir(save_dir)
+                        os.makedirs(save_dir)
 
                     if os.path.exists(save_dir):
                         new_filename = secure_filename(file.filename)
@@ -680,7 +733,11 @@ def admin(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
     
-    user_stats = GetUserStats(task_id)
+    # タスク情報を読み込む
+    task:Task = Task(task_id)
+
+    # ユーザ成績を読み込む
+    user_stats = GetUserStats(task_id, task.metric)
 
     # 辞書をリスト化してソート
     stats_list = []
@@ -690,7 +747,7 @@ def admin(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, test=True, message=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, test=True, message=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -706,17 +763,10 @@ if __name__ == "__main__":
         task_id = os.path.basename(os.path.dirname(dir))
 
         try:
-            # タスク名を取得
-            with open(os.path.join(dir, "task_name.txt"), "r", encoding='utf-8') as f:
-                task_name = f.readline().rstrip()
-                task_explanation = f.readline().rstrip()
-                date = f.readline().rstrip()
-                start_date = datetime.datetime.strptime(date, '%Y-%m-%d')
-                date = f.readline().rstrip()
-                end_date = datetime.datetime.strptime(date, '%Y-%m-%d')
-
-            print(f"found task: ({task_id}) {task_name} {task_explanation}")
-            TASK[task_id] = Task(task_name, task_explanation, start_date, end_date)
+            # タスク情報を取得
+            task:Task = Task(task_id)
+            print(f"found task: ({task_id}) {task.name} {task.explanation}")
+            TASK[task_id] = TaskInfo(task.name, task.explanation, task.start_date, task.end_date)
         except:
             continue
 
