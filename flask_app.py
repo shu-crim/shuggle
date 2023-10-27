@@ -692,7 +692,8 @@ def submit_table(user_id, user_key):
 
 @app.route('/source/<task_id>/<filename>')
 def source(task_id, filename):
-    with open(os.path.join(USER_MODULE_DIR_NAME, task_id, filename)) as f:
+    file_path = os.path.join(USER_MODULE_DIR_NAME, task_id, filename)
+    with open(file_path, 'r') as f:
         content = f.read()
 
     # 元のファイル名を復元
@@ -830,6 +831,7 @@ def upload_file(task_id):
                         new_filename = secure_filename(file.filename)
                         file.save(os.path.join(save_dir, new_filename))
                         msg = f'{file.filename}がアップロードされました。'
+
                         # メモを保存
                         if request.form['memo'] != "":
                             with open(os.path.join(save_dir, new_filename + '.txt'), mode='w', encoding='utf-8') as f:

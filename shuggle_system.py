@@ -13,6 +13,7 @@ import traceback
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import json
 from task import Task
+import chardet
 
 
 UPLOAD_DIR = r"./upload_dir"
@@ -302,6 +303,12 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     UpdateTtimestamp(task_id)
 
 
+def GetEncodingType(file):
+    with open(file, 'rb') as f:
+        rawdata = f.read()
+    return chardet.detect(rawdata)['encoding']
+
+
 def main():
     with ProcessPoolExecutor(max_workers=4) as proccess:
         while True:
@@ -330,11 +337,17 @@ def main():
                     if not os.path.exists(dir_user_module):
                         os.makedirs(dir_user_module)
 
-                    # ファイル移動を試みる
+                    # ファイルを読み込んで移動先に保存、元ファイルの削除を試みる
                     now = datetime.datetime.now()
                     new_filename = user_name + "_" + task_id + "_" + now.strftime('%Y%m%d_%H%M%S_') + os.path.basename(path)
                     try:
-                        shutil.move(path, os.path.join(dir_user_module, new_filename))
+                        #shutil.move(path, os.path.join(dir_user_module, new_filename))
+                        encoding = GetEncodingType(path)
+                        with open(path, 'r', encoding=encoding) as f:
+                            content = f.read()
+                        with open(os.path.join(dir_user_module, new_filename), 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        os.remove(path)
                     except:
                         continue
 
