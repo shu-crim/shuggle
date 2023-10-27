@@ -58,7 +58,7 @@
                 }
 
                 // ユーザ情報を照合
-                var request = new XMLHttpRequest()
+                var request = new XMLHttpRequest();
                 request.open("GET", "/verify/" + user_id + "/" + user_key, true);
                 request.onreadystatechange = function() {
                     if (request.readyState == 4 && request.status == 200) {
@@ -73,6 +73,19 @@
                             document.getElementById('input-user-key').value = user_key;
                             document.getElementById('input-pass-user-id').value = user_id;
                             document.getElementById('input-pass-user-key').value = user_key;
+                        
+                            // 提出テーブルを挿入
+                            var request_table = new XMLHttpRequest();
+                            request_table.open("GET", "/submit-table/" + user_id + "/" + user_key, true);
+                            request_table.onreadystatechange = function() {
+                                if (request_table.readyState == 4 && request_table.status == 200) {
+                                    //受信完了時の処理
+                                    var table_html = document.createTextNode(decodeURI(request_table.responseText));
+                                    document.getElementById('submit-table').appendChild(stringToHTML(table_html.data));
+                                }
+                            }
+                            request_table.send("");
+
                         } else {
                             // 照合に失敗したらログイン画面へ
                             window.location.href = "/login";
@@ -81,6 +94,12 @@
                 }
                 request.send("");
             });
+
+            function stringToHTML(str) {
+                var dom = document.createElement('div');
+                dom.innerHTML = str;
+                return dom;
+            }
 
             function logoutClick() {
                 // ログアウトする
@@ -205,9 +224,6 @@
                 <div class="container col-5">
                 </div>
             </div>
-
-            <br>
-            <br>
             <div class="row">
                 <div class="container col-10">
                 </div>
@@ -217,6 +233,13 @@
             </div>
         </div>
 
+        <br>
+
+        <div class="container col-11">
+            <h2>これまでの提出一覧</h2>
+        </div>
+        <div class="container col-11" id="submit-table">
+        </div>
 
         <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
         <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>

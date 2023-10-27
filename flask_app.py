@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response, Markup, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, make_response, Markup, send_from_directory, send_file
 from flask_httpauth import HTTPBasicAuth, HTTPDigestAuth
 from werkzeug.utils import secure_filename
 import json
@@ -22,6 +22,7 @@ TASK = {}
 USER_CSV_PATH = r"./data/users.csv"
 HASH_METHOD = "pbkdf2:sha256:260000"
 FILENAME_TASK_JSON = r"task.json"
+USER_MODULE_DIR_NAME = r"user_module"
 
 
 class UserData():
@@ -56,9 +57,9 @@ class Stats():
     username : str
     datetime : datetime
     filename : str = ""
-    train : list = [0, 0, 0.0]
-    valid : list = [0, 0, 0.0]
-    test : list = [0, 0, 0.0]
+    train : list = []
+    valid : list = []
+    test : list = []
     message : str = ''
     memo : str = ''
 
@@ -161,7 +162,7 @@ def UpdateUsersCsv(path:str, id:str, target:str, value:str) -> bool:
     return WriteUsersCsv(path, users)
 
 
-def GetUserStats(task_id, metric:Task.Metric) -> {}:
+def GetUserStats(task_id) -> {}:
     def TransIntIntFloat(true_false_accuracy : list):
         result = [0, 0, 0.0]
         try:
@@ -179,6 +180,9 @@ def GetUserStats(task_id, metric:Task.Metric) -> {}:
             return 0
         return result
     
+    # Task情報からmetricを読み込む
+    metric = Task(task_id).metric
+    
     # ユーザ情報を読み込む
     users = ReadUsersCsv(USER_CSV_PATH)
 
@@ -189,7 +193,7 @@ def GetUserStats(task_id, metric:Task.Metric) -> {}:
         if not user_id in users:
             continue
         user_name = users[user_id].name
-        stats[user_name] = []
+        stats[user_id] = []
         
         with open(file_path, "r", encoding='utf-8') as csv_file:
             line = csv_file.readline() # ヘッダ読み飛ばし
@@ -233,13 +237,13 @@ def GetUserStats(task_id, metric:Task.Metric) -> {}:
                     stats_read.test = test
                     stats_read.message = message
                     stats_read.memo = memo
-                    stats[user_name].append(stats_read)
+                    stats[user_id].append(stats_read)
                 except Exception as e:
                     print(e)
 
         # ひとつも読めなかった場合はキーを削除
-        if len(stats[user_name]) == 0:
-            stats.pop(user_name)
+        if len(stats[user_id]) == 0:
+            stats.pop(user_id)
 
     return stats
 
@@ -383,6 +387,81 @@ def CreateInProcHtml(task_id):
             inproc_text += f"{users[user_id].name} さんの評価を実行中です。<br>"
 
     return inproc_text + '<br>'
+
+
+class Submit:
+    stats: Stats
+    task_id: str
+    task_name: str
+    metric: Task.Metric
+
+
+def CreateSubmitTableRow(submit: Submit):
+    try:
+        html_submit = ""
+        html_submit += f'<tr>'
+        html_submit += f'<td><a href="/source/{submit.task_id}/{submit.stats.filename}" class="link-info">{submit.stats.datetime}</a></td>'
+        html_submit += f'<td><a href="/{submit.task_id}/task" class="link-info">{submit.task_name}</a></td>'
+
+        html_temp = ""
+        if submit.metric == Task.Metric.Accuracy:
+            html_temp += f'<td>{submit.stats.train[2] * 100:.2f} &percnt;</td>' if submit.stats.train[0] + submit.stats.train[1] > 0 else '<td>0.00 &percnt;</td>'
+            html_temp += f'<td>{submit.stats.valid[2] * 100:.2f} &percnt;</td>' if submit.stats.valid[0] + submit.stats.valid[1] > 0 else '<td>0.00 &percnt;</td>'
+        elif submit.metric == Task.Metric.MAE:
+            try:
+                html_temp += f'<td>{submit.stats.train:.3f}(MAE)</td>'
+                html_temp += f'<td>{submit.stats.valid:.3f}(MAE)</td>'
+            except:
+                html_temp += '<td>-</td><td>-</td>'
+
+        html_submit += html_temp
+
+        html_submit += f'<td>{submit.stats.memo}</td>'
+        html_submit += f'<td>{submit.stats.message}</td>'
+        html_submit += f'</tr>'
+    except:
+        return ""
+
+    return html_submit
+
+
+def CreateSubmitTable(user_id) -> str:
+    submits = []
+
+    # user_idのstatsをTaskごとに取得
+    for task_id, task in TASK.items():
+        stats_temp = GetUserStats(task_id)
+        if user_id in stats_temp:
+            for item in stats_temp[user_id]:
+                submit: Submit = Submit()
+                submit.stats = item
+                submit.task_id = task.id
+                submit.task_name = task.name
+                submit.metric = task.metric
+                submits.append(submit)
+
+    # 提出日時でソート
+    sorted_submits = sorted(submits, key=lambda x: x.stats.datetime, reverse=True)
+    
+    # 表のHTMLを作成
+    html_table = '<table class="table table-dark">'
+    html_table += "<thead><tr>"
+    html_table += "<th>提出日時</th>"
+    html_table += "<th>Task</th>"
+    html_table += "<th>train</th>"
+    html_table += "<th>valid</th>"
+    html_table += "<th>メモ</th>"
+    html_table += "<th>メッセージ</th>"
+    html_table += "</tr></thead>"
+    html_table += "<tbody>"
+
+    for submit in sorted_submits:
+        html_table += CreateSubmitTableRow(submit)
+
+    html_table += "</tbody>"
+    html_table += "</table>"
+
+    return html_table
 
 
 def VerifyEmailAndPassword(email, password):
@@ -598,6 +677,32 @@ def user():
         return render_template(f'user.html', user_name=new_name, update_user_data="true", message=message)
 
 
+@app.route('/submit-table/<user_id>/<user_key>')
+def submit_table(user_id, user_key):
+    # 認証
+    verified, user_data = VerifyIdAndKey(user_id, user_key)
+    if not verified:
+        return redirect(url_for('login'))
+    
+    # 提出テーブルを作成
+    table_html = CreateSubmitTable(user_id)
+
+    return table_html
+
+
+@app.route('/source/<task_id>/<filename>')
+def source(task_id, filename):
+    with open(os.path.join(USER_MODULE_DIR_NAME, task_id, filename)) as f:
+        content = f.read()
+
+    # 元のファイル名を復元
+    filename_split = filename.split('_')
+    filename_head = f"{filename_split[0]}_{filename_split[1]}_{filename_split[2]}_{filename_split[3]}_"
+    filename_org = filename.replace(filename_head, '')
+
+    return render_template(f'source.html', source=content, filename=filename_org)
+
+
 @app.route('/verify/<user_id>/<user_key>', methods=['GET'])
 def verify(user_id, user_key):
     verified = False
@@ -646,16 +751,16 @@ def board(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = GetUserStats(task_id, task.metric)
+    user_stats = GetUserStats(task_id)
 
     # 辞書をリスト化してソート
     latest_stats_list = []
-    for user_name, stats in user_stats.items():
+    for stats in user_stats.values():
         latest_stats_list.append(stats[-1])
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, memo=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -672,7 +777,7 @@ def log(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = GetUserStats(task_id, task.metric)
+    user_stats = GetUserStats(task_id)
 
     # 辞書をリスト化してソート
     stats_list = []
@@ -682,7 +787,7 @@ def log(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, message=True, memo=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -747,7 +852,7 @@ def admin(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = GetUserStats(task_id, task.metric)
+    user_stats = GetUserStats(task_id)
 
     # 辞書をリスト化してソート
     stats_list = []
@@ -776,7 +881,8 @@ if __name__ == "__main__":
             # タスク情報を取得
             task:Task = Task(task_id)
             print(f"found task: ({task_id}) {task.name} {task.explanation}")
-            TASK[task_id] = TaskInfo(task.name, task.explanation, task.start_date, task.end_date)
+            # TASK[task_id] = TaskInfo(task.name, task.explanation, task.start_date, task.end_date)
+            TASK[task_id] = task
         except:
             continue
 
