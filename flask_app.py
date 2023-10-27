@@ -86,7 +86,7 @@ auth_users = {
 def ReadUsersCsv(path:str):
     users = {}
     try:
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             f.readline() # ヘッダを読み飛ばす
             while True:
                 line = f.readline()
@@ -104,11 +104,19 @@ def ReadUsersCsv(path:str):
 
 def WriteUsersCsv(path:str, users:dict, must_backup:bool=True) -> bool:
     # バックアップをとる
-    try:
-        shutil.copy2(path, os.path.join(os.path.dirname(path), "backup", datetime.datetime.now().strftime('users_%Y%m%d_%H%M%S_%f.csv')))
-    except:
-        if must_backup:
-            return False
+    if os.path.exists(path):
+        try:
+            backup_dir = os.path.join(os.path.dirname(path), "backup")
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            shutil.copy2(path, os.path.join(backup_dir, datetime.datetime.now().strftime('users_%Y%m%d_%H%M%S_%f.csv')))
+        except:
+            if must_backup:
+                return False
+            
+    # ディレクトリが無ければ作成
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
     
     # 上書き作成する
     try:
@@ -470,6 +478,7 @@ def VerifyEmailAndPassword(email, password):
     
     # 認証を行う
     verified = False
+    user_data = None
     for id, user_data in users.items():
         if user_data.email == email:
             pass_hash = user_data.pass_hash
@@ -697,14 +706,14 @@ def source(task_id, filename):
         return render_template(f'source.html', filename='ファイルが見つかりません')
 
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
         # 元のファイル名を復元
         filename_split = filename.split('_')
         filename_head = f"{filename_split[0]}_{filename_split[1]}_{filename_split[2]}_{filename_split[3]}_"
         filename_org = filename.replace(filename_head, '')
-    except:
+    except Exception as e:
         return render_template(f'source.html', filename='ファイルを読み込めません')
 
     return render_template(f'source.html', source=content, filename=filename_org)
@@ -733,7 +742,7 @@ def task_index(task_id):
 @app.route('/<task_id>/timestamp', methods=['GET'])
 def get_timestamp(task_id):
     try:
-        with open(os.path.join(OUTPUT_DIR, task_id, "timestamp.txt"), "r") as f:
+        with open(os.path.join(OUTPUT_DIR, task_id, "timestamp.txt"), "r", encoding='utf-8') as f:
             timestamp = f.read()
     except:
         timestamp = ''

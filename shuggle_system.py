@@ -28,12 +28,16 @@ FILENAME_DATASET_JSON = r"dataset.json"
 
 
 def UpdateTtimestamp(task_id):
-    with open(os.path.join(OUTPUT_DIR, task_id, TIMESTAMP_FILE_NAME), "w") as f:
+    # ディレクトリが無ければ作成
+    if not os.path.exists(os.path.join(OUTPUT_DIR, task_id)):
+        os.makedirs(os.path.join(OUTPUT_DIR, task_id))
+
+    with open(os.path.join(OUTPUT_DIR, task_id, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
 def read_dataset(path_json, answer_value_type=int, multi_data=False, data_type="image-3ch"):
-    json_open = open(path_json, 'r')
+    json_open = open(path_json, 'r', encoding='utf-8')
     dataset = json.load(json_open)
 
     filename_list = []
