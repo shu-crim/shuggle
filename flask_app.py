@@ -693,13 +693,19 @@ def submit_table(user_id, user_key):
 @app.route('/source/<task_id>/<filename>')
 def source(task_id, filename):
     file_path = os.path.join(USER_MODULE_DIR_NAME, task_id, filename)
-    with open(file_path, 'r') as f:
-        content = f.read()
+    if not os.path.exists(file_path):
+        return render_template(f'source.html', filename='ファイルが見つかりません')
 
-    # 元のファイル名を復元
-    filename_split = filename.split('_')
-    filename_head = f"{filename_split[0]}_{filename_split[1]}_{filename_split[2]}_{filename_split[3]}_"
-    filename_org = filename.replace(filename_head, '')
+    try:
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        # 元のファイル名を復元
+        filename_split = filename.split('_')
+        filename_head = f"{filename_split[0]}_{filename_split[1]}_{filename_split[2]}_{filename_split[3]}_"
+        filename_org = filename.replace(filename_head, '')
+    except:
+        return render_template(f'source.html', filename='ファイルを読み込めません')
 
     return render_template(f'source.html', source=content, filename=filename_org)
 
