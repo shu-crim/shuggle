@@ -15,7 +15,6 @@ import json
 from task import Task
 
 
-NUM_CLASS = 5
 UPLOAD_DIR = r"./upload_dir"
 USER_MODULE_DIR_NAME = r"user_module"
 OUTPUT_DIR = r"./output"
@@ -81,7 +80,8 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type):
         answer_list = np.zeros((num_problem), answer_value_type)
         with Pool(processes=1) as p:
             for i in range(num_problem):
-                time_limit = PROC_TIMEOUT_SEC * 20 if i == 0 else PROC_TIMEOUT_SEC # 初回のみオーバーヘッドを考慮してゆるめ
+                num_input_data = input_data_list[i].shape[0]
+                time_limit = PROC_TIMEOUT_SEC * (num_input_data + 20) if i == 0 else PROC_TIMEOUT_SEC * num_input_data # 初回のみオーバーヘッドを考慮してゆるめ
 
                 start_time = time.time()
                 apply_result = p.apply_async(func_recognition, (input_data_list[i],))

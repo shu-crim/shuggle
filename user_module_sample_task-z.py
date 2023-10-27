@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 import cv2
 import json
+import time
 
 DIR_TASK = r"./tasks/task-z"
 FILENAME_TASK_JSON = r"task.json"
@@ -70,7 +71,7 @@ def read_dataset(path_json, answer_value_type=int, multi_data=False, input_data_
 
 def recognition(input_data) -> float:
     # ここに処理を書く
-
+    time.sleep(1.1 * input_data.shape[0])
 
     # floatで推定値を返す
     return np.random.uniform(0, 2)
