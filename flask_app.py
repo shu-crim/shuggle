@@ -18,7 +18,9 @@ OUTPUT_DIR = r"./output"
 UPLOAD_DIR_ROOT = r"./upload_dir"
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
+SETTING = None
 USER_CSV_PATH = r"./data/users.csv"
+SETTING_JSON_PATH = r"./data/setting.json"
 HASH_METHOD = "pbkdf2:sha256:260000"
 USER_MODULE_DIR_NAME = r"user_module"
 
@@ -632,7 +634,7 @@ def login():
         from_url = "/"
 
     if request.method == 'GET':
-        return render_template(f'login.html', from_url=from_url, message="")
+        return render_template(f'login.html', from_url=from_url, message="", email_admin=SETTING["admin"]["email"])
     
     elif request.method == 'POST':
         try:
@@ -640,12 +642,12 @@ def login():
             password = request.form['inputPassword']
             next_url = request.form['nextUrl']
         except:
-            return render_template(f'login.html', from_url=from_url, message="入力データを受け取れませんでした。")
+            return render_template(f'login.html', from_url=from_url, message="入力データを受け取れませんでした。", email_admin=SETTING["admin"]["email"])
         
         # emailとパスワードで照合
         verified, user_data = VerifyEmailAndPassword(email, password)
         if not verified:
-            return render_template(f'login.html', from_url=from_url, message="Email addressかPasswordが誤っています。")
+            return render_template(f'login.html', from_url=from_url, message="Email addressかPasswordが誤っています。", email_admin=SETTING["admin"]["email"])
 
         # 認証OKなので本人確認用のキーを作成して渡す
         user_key = str(uuid.uuid4()).split('-')[0]
@@ -918,6 +920,13 @@ def admin(task_id):
 
 
 if __name__ == "__main__":
+    try:
+        json_open = open(SETTING_JSON_PATH, 'r', encoding='utf-8')
+        SETTING = json.load(json_open)          
+    except:
+        print(f"settingファイルを開けません: {SETTING_JSON_PATH}")
+        exit()
+
     # タスク一覧を作成
     dir_list = glob.glob(Task.TASKS_DIR + '/**/')
     for dir in dir_list:
