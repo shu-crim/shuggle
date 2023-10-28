@@ -10,7 +10,9 @@ $(document).ready(function() {
 
     // ユーザ情報がない
     if (user_id == null || user_name == null || user_key == null){
-        id_user_name.textContent = "ログイン";
+        if (id_user_name != null) {
+            id_user_name.textContent = "ログイン";
+        }
         return;
     }
 
@@ -28,7 +30,9 @@ $(document).ready(function() {
                     id_user_name.textContent = user_name + " さんのユーザページ";
                 }
             } else {
-                id_user_name.textContent = "ログイン";
+                if (id_user_name != null) {
+                    id_user_name.textContent = "ログイン";
+                }
             }
         }
     }

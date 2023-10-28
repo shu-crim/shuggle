@@ -30,7 +30,7 @@
                 <label for="inputPassword" class="sr-only">Password</label>
                 <input type="password" name="inputPassword" class="form-control" placeholder="Password" required>
                 <br>
-                <input type="hidden" name="nextUrl" value="/">
+                <input type="hidden" name="nextUrl" value="{{from_url}}">
                 <input type="submit" value="Login" class="btn btn-lg btn-outline-info btn-block" id="buttonLogin">
             </form>
         </div>
@@ -39,10 +39,10 @@
 
         <div class="container col-4">
             これから始める方は...<br>
-            <a href="/join" class="link-info">アカウントを作成する</a>
+            <a href="/join?from={{from_url}}" class="link-info">アカウントを作成する</a>
             <br><br>
             それとも...<br>
-            <a href="/" class="link-info">アカウントを作成せず結果だけ閲覧する</a>
+            <a href="{{from_url}}" class="link-info">アカウントを作成せず結果だけ閲覧する</a>
         </div>
 
         <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>

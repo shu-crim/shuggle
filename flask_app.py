@@ -241,7 +241,7 @@ def GetUserStats(task_id) -> {}:
     return stats
 
 
-def menuHTML(page, task_id=""):
+def menuHTML(page, task_id="", url_from=""):
     html = """
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
@@ -282,11 +282,11 @@ def menuHTML(page, task_id=""):
             task_id
         )
 
-    html += """
+    html += f"""
                     </ul>
                     <ul class="navbar-nav ml-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a id="login-user-name" class="nav-link active" aria-current="page" href="/user/info"></a>
+                            <a id="login-user-name" class="nav-link active" aria-current="page" href="/user/info{'?from=' + url_from if url_from != '' else ''}"></a>
                         </li>
                     </ul>
                 </div>
@@ -553,9 +553,8 @@ def index():
                     'explanation': value.explanation
                 }
             )
-
     
-    return render_template(f'index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_prepare=task_list_prepare, menu=menuHTML(Page.HOME))
+    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_prepare=task_list_prepare, menu=menuHTML(Page.HOME, url_from="/"))
 
 
 @app.route('/favicon.ico')
@@ -565,8 +564,12 @@ def favicon():
 
 @app.route('/join', methods=['GET', 'POST'])
 def join():
+    from_url = request.args.get('from')
+    if from_url is None:
+        from_url = "/"
+
     if request.method == 'GET':
-        return render_template(f'join.html', message="")
+        return render_template(f'join.html', from_url=from_url, message="")
     
     elif request.method == 'POST':
         try:
@@ -575,11 +578,11 @@ def join():
             password_verify = request.form['inputPasswordVerify']
             next_url = request.form['nextUrl']
         except:
-            return render_template(f'join.html', message="入力データを受け取れませんでした。")
+            return render_template(f'join.html', from_url=from_url, message="入力データを受け取れませんでした。")
         
         # 2つのパスワード入力の一致チェック
         if password != password_verify:
-            return render_template(f'join.html', message="再入力したパスワードが一致していません。")
+            return render_template(f'join.html', from_url=from_url, message="再入力したパスワードが一致していません。")
         
         # ユーザ情報を読み込む
         users = ReadUsersCsv(USER_CSV_PATH)
@@ -591,7 +594,7 @@ def join():
                 duplicate = True
                 break
         if duplicate:
-            return render_template(f'join.html', message="そのEmail addressは既に登録されています。")
+            return render_template(f'join.html', from_url=from_url, message="そのEmail addressは既に登録されています。")
         
         # ID発行
         user_id = ""
@@ -604,7 +607,7 @@ def join():
                 break
 
         if user_id == "":
-            return render_template(f'join.html', message="IDを発行できませんでした。")
+            return render_template(f'join.html', from_url=from_url, message="IDを発行できませんでした。")
         
         # パスワードをハッシュ化
         pass_hash = generate_password_hash(password, salt_length=21)
@@ -617,15 +620,19 @@ def join():
         success = AddUsersCsv(USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
 
         if not success:
-            return render_template(f'join.html', message="ユーザ情報を登録できませんでした。")
+            return render_template(f'join.html', from_url=from_url, message="ユーザ情報を登録できませんでした。")
 
-        return render_template(f'user.html', user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
+        return render_template(f'user.html', from_url=from_url, user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    from_url = request.args.get('from')
+    if from_url is None:
+        from_url = "/"
+
     if request.method == 'GET':
-        return render_template(f'login.html', message="")
+        return render_template(f'login.html', from_url=from_url, message="")
     
     elif request.method == 'POST':
         try:
@@ -633,12 +640,12 @@ def login():
             password = request.form['inputPassword']
             next_url = request.form['nextUrl']
         except:
-            return render_template(f'login.html', message="入力データを受け取れませんでした。")
+            return render_template(f'login.html', from_url=from_url, message="入力データを受け取れませんでした。")
         
         # emailとパスワードで照合
         verified, user_data = VerifyEmailAndPassword(email, password)
         if not verified:
-            return render_template(f'login.html', message="Email addressかPasswordが誤っています。")
+            return render_template(f'login.html', from_url=from_url, message="Email addressかPasswordが誤っています。")
 
         # 認証OKなので本人確認用のキーを作成して渡す
         user_key = str(uuid.uuid4()).split('-')[0]
@@ -646,13 +653,14 @@ def login():
         # キーを保存
         UpdateUsersCsv(USER_CSV_PATH, user_data.id, 'key', user_key)
 
-        return render_template(f'user.html', user_email=email, user_id=user_data.id, user_key=user_key, user_name=user_data.name, next_url=next_url, login="true", update_user_data="true")
+        return render_template(f'user.html', from_url=from_url, user_email=email, user_id=user_data.id, user_key=user_key, user_name=user_data.name, next_url=next_url, login="true", update_user_data="true")
 
 
 @app.route('/user/info', methods=['GET', 'POST'])
 def user():
     if request.method == 'GET':
-        return render_template(f'user.html', login="false")
+        from_url = request.args.get('from')
+        return render_template(f'user.html', login="false", from_url=from_url if from_url is not None else "/")
 
     elif request.method == 'POST':
         try:
@@ -770,7 +778,7 @@ def task(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
 
-    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id), task_name=TASK[task_id].name)
+    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name)
 
 
 @app.route("/<task_id>/board")
@@ -803,7 +811,7 @@ def board(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
 
 
 @app.route("/<task_id>/log")
@@ -830,7 +838,7 @@ def log(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
@@ -878,7 +886,7 @@ def upload_file(task_id):
                 except:
                     msg = "アップロードに失敗しました。"
 
-    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, menu=menuHTML(Page.UPLOAD, task_id))
+    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload"), url_from=f"/{task_id}/upload")
   
 
 @app.route('/<task_id>/admin')
@@ -906,7 +914,7 @@ def admin(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id), inproc_text=Markup(inproc_text), num_col=num_col)
+    return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin"), inproc_text=Markup(inproc_text), num_col=num_col)
 
 
 if __name__ == "__main__":

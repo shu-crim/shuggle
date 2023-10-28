@@ -23,9 +23,10 @@
                 var user_name = localStorage.getItem("user_name");
 
                 // ユーザ情報がなければログイン画面へ
-                if (user_id == null || user_name == null || user_key == null){
+                if (user_id == null || user_name == null || user_key == null ||
+                    user_id == "" || user_name == "" || user_key == ""){
                     console.log("user data not found")
-                    window.location.href = "/login";
+                    window.location.href = "/login?from=" + "{{url_from}}";
                 }
 
                 // ユーザ情報を照合
@@ -42,7 +43,7 @@
                             input_user_key.value = user_key;
                         } else {
                             // 照合に失敗したらログイン画面へ
-                            window.location.href = "/login";
+                            window.location.href = "/login?from=" + "{{url_from}}";
                         }
                     }
                 }
