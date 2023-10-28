@@ -760,12 +760,17 @@ def get_timestamp(task_id):
     return timestamp
 
 
+@app.route('/<task_id>/card.png')
+def get_taskcard(task_id):
+    return send_from_directory(os.path.join(Task.TASKS_DIR, task_id), "card.png")
+
+
 @app.route("/<task_id>/task")
 def task(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
 
-    return render_template(f'task/{task_id}.html', menu=menuHTML(Page.TASK, task_id), task_name=TASK[task_id].name)
+    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id), task_name=TASK[task_id].name)
 
 
 @app.route("/<task_id>/board")

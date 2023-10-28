@@ -34,7 +34,7 @@
                 {% for task in task_list_open %}
                 <div class="col">
                 <div class="card text-white bg-dark mb-3" style="width: 18rem;">
-                    <a href="/{{task.id}}/task"><img src="/static/img/{{task.id}}.png" class="card-img-top"></a>
+                    <a href="/{{task.id}}/task"><img src="/{{task.id}}/card.png" class="card-img-top"></a>
                     <div class="card-body">
                         <p class="card-text">{{task.explanation}}</p>
                     </div>
@@ -62,7 +62,7 @@
                 {% for task in task_list_closed %}
                 <div class="col">
                 <div class="card text-white bg-dark mb-3" style="width: 18rem;">
-                    <a href="/{{task.id}}/task"><img src="/static/img/{{task.id}}.png" class="card-img-top"></a>
+                    <a href="/{{task.id}}/task"><img src="/{{task.id}}/card.png" class="card-img-top"></a>
                     <div class="card-body">
                         <p class="card-text">{{task.explanation}}</p>
                     </div>
@@ -90,7 +90,7 @@
                 {% for task in task_list_prepare %}
                 <div class="col">
                 <div class="card text-white bg-dark mb-3" style="width: 18rem;">
-                    <a href="/{{task.id}}/task"><img src="/static/img/{{task.id}}.png" class="card-img-top"></a>
+                    <a href="/{{task.id}}/task"><img src="/{{task.id}}/card.png" class="card-img-top"></a>
                     <div class="card-body">
                         <p class="card-text">{{task.explanation}}</p>
                     </div>
