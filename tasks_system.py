@@ -13,27 +13,28 @@ import traceback
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import json
 from task import Task
+import chardet
 
 
-NUM_CLASS = 5
 UPLOAD_DIR = r"./upload_dir"
-USER_MODULE_DIR_NAME = r"user_module"
 OUTPUT_DIR = r"./output"
-INPUT_DATA_DIR =r"./input_data"
-CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
+USER_MODULE_DIR_NAME = r"user_module"
 TIMESTAMP_FILE_NAME = r"timestamp.txt"
-PROC_TIMEOUT_SEC = 1
-FILENAME_TASK_JSON = r"task.json"
 FILENAME_DATASET_JSON = r"dataset.json"
+PROC_TIMEOUT_SEC = 1
 
 
 def UpdateTtimestamp(task_id):
-    with open(os.path.join(OUTPUT_DIR, task_id, TIMESTAMP_FILE_NAME), "w") as f:
+    # ディレクトリが無ければ作成
+    if not os.path.exists(os.path.join(OUTPUT_DIR, task_id)):
+        os.makedirs(os.path.join(OUTPUT_DIR, task_id))
+
+    with open(os.path.join(OUTPUT_DIR, task_id, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
 def read_dataset(path_json, answer_value_type=int, multi_data=False, data_type="image-3ch"):
-    json_open = open(path_json, 'r')
+    json_open = open(path_json, 'r', encoding='utf-8')
     dataset = json.load(json_open)
 
     filename_list = []
@@ -78,10 +79,11 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type):
     total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
-        answer_list = np.zeros((num_problem), int)
+        answer_list = np.zeros((num_problem), answer_value_type)
         with Pool(processes=1) as p:
             for i in range(num_problem):
-                time_limit = PROC_TIMEOUT_SEC * 20 if i == 0 else PROC_TIMEOUT_SEC # 初回のみオーバーヘッドを考慮してゆるめ
+                num_input_data = input_data_list[i].shape[0]
+                time_limit = PROC_TIMEOUT_SEC * (num_input_data + 20) if i == 0 else PROC_TIMEOUT_SEC * num_input_data # 初回のみオーバーヘッドを考慮してゆるめ
 
                 start_time = time.time()
                 apply_result = p.apply_async(func_recognition, (input_data_list[i],))
@@ -143,7 +145,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
     try:    
         # train
         num_train, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(INPUT_DATA_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(Task.TASKS_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
 
         answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type)
         if num_train == 0:
@@ -155,7 +157,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
 
         # valid
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(INPUT_DATA_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(Task.TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
         answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type)
         if num_valid == 0:
@@ -167,7 +169,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
 
         # test
         num_test, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(INPUT_DATA_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
        
         answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type)
         if num_test == 0:
@@ -302,6 +304,12 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     UpdateTtimestamp(task_id)
 
 
+def GetEncodingType(file):
+    with open(file, 'rb') as f:
+        rawdata = f.read()
+    return chardet.detect(rawdata)['encoding']
+
+
 def main():
     with ProcessPoolExecutor(max_workers=4) as proccess:
         while True:
@@ -330,11 +338,17 @@ def main():
                     if not os.path.exists(dir_user_module):
                         os.makedirs(dir_user_module)
 
-                    # ファイル移動を試みる
+                    # ファイルを読み込んで移動先に保存、元ファイルの削除を試みる
                     now = datetime.datetime.now()
                     new_filename = user_name + "_" + task_id + "_" + now.strftime('%Y%m%d_%H%M%S_') + os.path.basename(path)
                     try:
-                        shutil.move(path, os.path.join(dir_user_module, new_filename))
+                        #shutil.move(path, os.path.join(dir_user_module, new_filename))
+                        encoding = GetEncodingType(path)
+                        with open(path, 'r', encoding=encoding) as f:
+                            content = f.read()
+                        with open(os.path.join(dir_user_module, new_filename), 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        os.remove(path)
                     except:
                         continue
 

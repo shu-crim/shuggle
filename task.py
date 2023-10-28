@@ -4,11 +4,11 @@ import datetime
 from enum import Enum
 import json
 
-TASK_DATA_DIR =r"./input_data"
-FILENAME_TASK_JSON = r"task.json"
-
 
 class Task:
+    TASKS_DIR =r"./tasks"
+    FILENAME_TASK_JSON = r"task.json"
+
     class AnswerValueType(Enum):
         real = 1
         integer = 2
@@ -38,7 +38,7 @@ class Task:
 
     def __init__(self, task_id) -> None:
         try:
-            task_json_path = os.path.join(TASK_DATA_DIR, task_id, FILENAME_TASK_JSON)
+            task_json_path = os.path.join(Task.TASKS_DIR, task_id, Task.FILENAME_TASK_JSON)
             json_open = open(task_json_path, 'r', encoding='utf-8')
             task = json.load(json_open)
             task = task["info"]

@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Shuggle</title>
+        <title>IR Tasks</title>
         <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
         <link rel="stylesheet" href="{{url_for('static', filename='css/shuggle.css')}}">
 
@@ -18,8 +18,8 @@
         {{menu}}
 
         <div class="container col-11">
-            <h1><span style="color:#00a497">S</span>huggle</h1>
-            <h4>データ処理Task評価システム</h4>
+            <h1>IR <span style="color:#00a497">T</span>asks</h1>
+            <h4>データ処理Task評価サービス</h4>
         </div>
 
         <br>
@@ -71,6 +71,29 @@
                         <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/board">評価結果</a></li>
                         <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/upload">提出</a></li>
                     </ul>
+                </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <br>
+
+        {% if task_list_prepare|length > 0 %}
+        <div class="container col-11">
+            <h2>準備中の<span style="color:#00a497">T</span>ask</h2>
+        </div>
+
+        <div class="container col-11">
+            <div class="row row-cols-auto">
+                {% for task in task_list_prepare %}
+                <div class="col">
+                <div class="card text-white bg-dark mb-3" style="width: 18rem;">
+                    <a href="/{{task.id}}/task"><img src="/static/img/{{task.id}}.png" class="card-img-top"></a>
+                    <div class="card-body">
+                        <p class="card-text">{{task.explanation}}</p>
+                    </div>
                 </div>
                 </div>
                 {% endfor %}
