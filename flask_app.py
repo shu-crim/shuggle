@@ -14,14 +14,12 @@ import shutil
 from task import Task
 
 
-TASKS_DIR = r"./tasks"
 OUTPUT_DIR = r"./output"
 UPLOAD_DIR_ROOT = r"./upload_dir"
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
 USER_CSV_PATH = r"./data/users.csv"
 HASH_METHOD = "pbkdf2:sha256:260000"
-FILENAME_TASK_JSON = r"task.json"
 USER_MODULE_DIR_NAME = r"user_module"
 
 
@@ -38,19 +36,6 @@ class UserData():
         self.pass_hash = pass_hash
         self.name = name
         self.key = key
-
-
-class TaskInfo():
-    name : str
-    explanation : str
-    start_date : datetime.datetime
-    end_date : datetime.datetime
-
-    def __init__(self, name, explanation, start_date, end_date) -> None:
-        self.name = name
-        self.explanation = explanation
-        self.start_date = start_date
-        self.end_date = end_date
 
 
 class Stats():
@@ -260,7 +245,7 @@ def menuHTML(page, task_id=""):
     html = """
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
-                <a class="navbar-brand" href="/"><span style="color:#00a497">S</span>huggle</a>
+                <a class="navbar-brand" href="/">IR <span style="color:#00a497">T</span>asks</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -921,7 +906,7 @@ def admin(task_id):
 
 if __name__ == "__main__":
     # タスク一覧を作成
-    dir_list = glob.glob(TASKS_DIR + '/**/')
+    dir_list = glob.glob(Task.TASKS_DIR + '/**/')
     for dir in dir_list:
         # ディレクトリ名を取得→タスクIDとして使う
         task_id = os.path.basename(os.path.dirname(dir))
@@ -930,7 +915,6 @@ if __name__ == "__main__":
             # タスク情報を取得
             task:Task = Task(task_id)
             print(f"found task: ({task_id}) {task.name} {task.explanation}")
-            # TASK[task_id] = TaskInfo(task.name, task.explanation, task.start_date, task.end_date)
             TASK[task_id] = task
         except:
             continue

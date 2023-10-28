@@ -17,14 +17,11 @@ import chardet
 
 
 UPLOAD_DIR = r"./upload_dir"
-USER_MODULE_DIR_NAME = r"user_module"
 OUTPUT_DIR = r"./output"
-TASKS_DIR =r"./tasks"
-CORRECT_ANSWER_CSV_FILENAME = r"correct_answer.csv"
+USER_MODULE_DIR_NAME = r"user_module"
 TIMESTAMP_FILE_NAME = r"timestamp.txt"
-PROC_TIMEOUT_SEC = 1
-FILENAME_TASK_JSON = r"task.json"
 FILENAME_DATASET_JSON = r"dataset.json"
+PROC_TIMEOUT_SEC = 1
 
 
 def UpdateTtimestamp(task_id):
@@ -148,7 +145,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
     try:    
         # train
         num_train, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(TASKS_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(Task.TASKS_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
 
         answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type)
         if num_train == 0:
@@ -160,7 +157,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
 
         # valid
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(Task.TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
         answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type)
         if num_valid == 0:
@@ -172,7 +169,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
 
         # test
         num_test, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+            os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
        
         answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type)
         if num_test == 0:
