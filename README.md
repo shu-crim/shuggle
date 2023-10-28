@@ -1,4 +1,4 @@
-# Shuggle
+# IR Tasks
 ## ダウンロードしてstaticディレクトリ下に配置する必要のあるライブラリファイル
 - jQuery
     - https://jquery.com/download/
