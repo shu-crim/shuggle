@@ -178,14 +178,14 @@ def GetUserStats(task_id) -> {}:
             result[1] = int(true_false_accuracy[1])
             result[2] = float(true_false_accuracy[2])
         except:
-            return [0, 0, 0.0]
+            return [-1, -1, -1] #評価不能は負値
         return result
 
     def TransFloat(num:str):
         try:
             result = float(num)
         except:
-            return 0
+            return -1 #評価不能は負値
         return result
     
     # Task情報からmetricを読み込む
@@ -312,7 +312,7 @@ def menuHTML(page, task_id=""):
     return Markup(html)
 
 
-def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=False):
+def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=False, visible_invalid_result=False):
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
@@ -320,18 +320,30 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
 
     html_temp = ""
     if metric == Task.Metric.Accuracy:
-        html_user += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
-        html_user += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
-        if test:
-            html_user += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
-    elif metric == Task.Metric.MAE:
-        try:
-            html_temp += f'<td>{stats.train:.3f}</td>'
-            html_temp += f'<td>{stats.valid:.3f}</td>'
+        if stats.train[0] < 0:
+            if visible_invalid_result:
+                html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
+            else:
+                return ""
+        else:
+            html_temp += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
+            html_temp += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
             if test:
-                html_temp += f'<td>{stats.test:.3f}</td>'
-        except:
-            html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
+                html_temp += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+    elif metric == Task.Metric.MAE:
+        if stats.train < 0:
+            if visible_invalid_result:
+                html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
+            else:
+                return ""
+        else:
+            try:
+                html_temp += f'<td>{stats.train:.3f}</td>'
+                html_temp += f'<td>{stats.valid:.3f}</td>'
+                if test:
+                    html_temp += f'<td>{stats.test:.3f}</td>'
+            except:
+                html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
 
     html_user += html_temp
 
@@ -340,6 +352,7 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
     if message:
         html_user += f'<td>{stats.message}</td>'
     html_user += f'</tr>'
+
     return html_user
 
 
@@ -404,7 +417,7 @@ class Submit:
     metric: Task.Metric
 
 
-def CreateSubmitTableRow(submit: Submit):
+def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False):
     try:
         html_submit = ""
         html_submit += f'<tr>'
@@ -413,12 +426,24 @@ def CreateSubmitTableRow(submit: Submit):
 
         html_temp = ""
         if submit.metric == Task.Metric.Accuracy:
-            html_temp += f'<td>{submit.stats.train[2] * 100:.2f} &percnt;</td>' if submit.stats.train[0] + submit.stats.train[1] > 0 else '<td>0.00 &percnt;</td>'
-            html_temp += f'<td>{submit.stats.valid[2] * 100:.2f} &percnt;</td>' if submit.stats.valid[0] + submit.stats.valid[1] > 0 else '<td>0.00 &percnt;</td>'
+            if submit.stats.train[0] < 0:
+                if  visible_invalid_data:
+                    html_temp += '<td>-</td><td>-</td>'
+                else:
+                    return ""
+            else:
+                html_temp += f'<td>{submit.stats.train[2] * 100:.2f} &percnt;</td>' if submit.stats.train[0] + submit.stats.train[1] > 0 else '<td>0.00 &percnt;</td>'
+                html_temp += f'<td>{submit.stats.valid[2] * 100:.2f} &percnt;</td>' if submit.stats.valid[0] + submit.stats.valid[1] > 0 else '<td>0.00 &percnt;</td>'
         elif submit.metric == Task.Metric.MAE:
             try:
-                html_temp += f'<td>{submit.stats.train:.3f}(MAE)</td>'
-                html_temp += f'<td>{submit.stats.valid:.3f}(MAE)</td>'
+                if submit.stats.train < 0:
+                    if visible_invalid_data:
+                        html_temp += '<td>-</td><td>-</td>'
+                    else:
+                        return ""
+                else:
+                    html_temp += f'<td>{submit.stats.train:.3f}(MAE)</td>'
+                    html_temp += f'<td>{submit.stats.valid:.3f}(MAE)</td>'
             except:
                 html_temp += '<td>-</td><td>-</td>'
 
@@ -464,7 +489,7 @@ def CreateSubmitTable(user_id) -> str:
     html_table += "<tbody>"
 
     for submit in sorted_submits:
-        html_table += CreateSubmitTableRow(submit)
+        html_table += CreateSubmitTableRow(submit, True)
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -772,7 +797,14 @@ def board(task_id):
     # 辞書をリスト化してソート
     latest_stats_list = []
     for stats in user_stats.values():
-        latest_stats_list.append(stats[-1])
+        # 各ユーザごとに最新の結果を抽出
+        for i in range(len(stats) - 1, -1, -1):
+            if task.metric == Task.Metric.Accuracy and stats[i].train[0] < 0:
+                continue
+            if task.metric == Task.Metric.MAE and stats[i].train < 0:
+                continue
+            latest_stats_list.append(stats[i])
+            break
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
