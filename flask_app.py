@@ -299,7 +299,19 @@ def menuHTML(page, task_id="", url_from=""):
     return Markup(html)
 
 
-def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=False, visible_invalid_result=False):
+def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
+    achieve = False
+    if metric == Task.Metric.Accuracy:
+        if evaluated_value >= goal:
+            achieve = True
+    elif metric == Task.Metric.MAE:
+        if evaluated_value <= goal:
+            achieve = True
+    
+    return ' style="color:#0dcaf0"' if achieve else ''
+
+
+def CreateTableRow(stats, metric:Task.Metric, goal=None, test=False, message=False, memo=False, visible_invalid_result=False):
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
@@ -313,10 +325,11 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
             else:
                 return ""
         else:
-            html_temp += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
-            html_temp += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(metric, stats.train[2], goal)}>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid[2], goal)}>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
             if test:
-                html_temp += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.test[2], goal)}>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+    
     elif metric == Task.Metric.MAE:
         if stats.train < 0:
             if visible_invalid_result:
@@ -325,10 +338,10 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
                 return ""
         else:
             try:
-                html_temp += f'<td>{stats.train:.3f}</td>'
-                html_temp += f'<td>{stats.valid:.3f}</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.train, goal)}>{stats.train:.3f}</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid, goal)}>{stats.valid:.3f}</td>'
                 if test:
-                    html_temp += f'<td>{stats.test:.3f}</td>'
+                    html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal)}>{stats.test:.3f}</td>'
             except:
                 html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
 
@@ -343,7 +356,7 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
     return html_user
 
 
-def CreateTable(stats_list, metric:Task.Metric, test=False, message=False, memo=False):
+def CreateTable(stats_list, metric:Task.Metric, goal=None, test=False, message=False, memo=False):
     def metricName(metric: Task.Metric):
         if metric == Task.Metric.Accuracy:
             return '正解率'
@@ -377,7 +390,7 @@ def CreateTable(stats_list, metric:Task.Metric, test=False, message=False, memo=
     html_table += "<tbody>"
 
     for stats in stats_list:
-        html_table += CreateTableRow(stats, metric, test=test, message=message, memo=memo)
+        html_table += CreateTableRow(stats, metric, goal, test=test, message=message, memo=memo)
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -527,36 +540,34 @@ def get_pw(username):
 @app.route('/')
 def index():
     today = datetime.datetime.now()
+    task_list_quest = []
     task_list_open = []
     task_list_closed = []
     task_list_prepare = []
     for key, value in TASK.items():
-        if value.start_date <= today and value.end_date > today:
-            task_list_open.append(
-                {
-                    'id': key,
-                    'name': value.name,
-                    'explanation': value.explanation
-                }
-            )
-        if value.end_date <= today:
-            task_list_closed.append(
-                {
-                    'id': key,
-                    'name': value.name,
-                    'explanation': value.explanation
-                }
-            )
-        if value.start_date > today:
-            task_list_prepare.append(
-                {
-                    'id': key,
-                    'name': value.name,
-                    'explanation': value.explanation
-                }
-            )
+        task:Task = value
+        info = {
+            'id': key,
+            'name': task.name,
+            'explanation': task.explanation
+        }
+
+        if value.start_date <= today:
+            # スタート後
+            if task.type == Task.TaskType.Quest:
+                # Questはいつでも開かれている
+                task_list_quest.append(info)
+            elif task.type == Task.TaskType.Contest:
+                # Contestは開催期間により振り分け
+                if value.end_date > today:
+                    task_list_open.append(info)
+                else:
+                    task_list_closed.append(info)
+        else:
+            # スタート前
+            task_list_prepare.append(info)
     
-    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_prepare=task_list_prepare, menu=menuHTML(Page.HOME, url_from="/"))
+    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"], menu=menuHTML(Page.HOME, url_from="/"))
 
 
 @app.route('/favicon.ico')
@@ -808,7 +819,7 @@ def board(task_id):
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -835,7 +846,7 @@ def log(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -911,7 +922,7 @@ def admin(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, test=True, message=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal, test=True, message=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -936,7 +947,7 @@ if __name__ == "__main__":
         try:
             # タスク情報を取得
             task:Task = Task(task_id)
-            print(f"found task: ({task_id}) {task.name} {task.explanation}")
+            print(f"found task: ({task_id}) {task.name}")
             TASK[task_id] = task
         except:
             continue

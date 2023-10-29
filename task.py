@@ -26,6 +26,11 @@ class Task:
         Image1ch = 1
         Image3ch = 2
 
+    class TaskType(Enum):
+        Quest = 1
+        Contest = 2
+
+
     id: str
     name: str
     explanation: str
@@ -35,6 +40,9 @@ class Task:
     metric: Metric
     input_data_type: InputDataType
     multi_input_data: bool
+    type: TaskType = TaskType.Quest
+    goal = 0
+    timelimit_per_data: float = 1.0
 
     def __init__(self, task_id) -> None:
         try:
@@ -52,6 +60,15 @@ class Task:
             self.metric = self.metricType(task["metric"])
             self.input_data_type = self.inputDataType(task["input_data_type"])
             self.multi_input_data = task["multi_input_data"]
+            if "type" in task:
+                if task["type"] == "quest":
+                    self.type = Task.TaskType.Quest
+                elif task["type"] == "contest":
+                    self.type = Task.TaskType.Contest
+            if "goal" in task:
+                self.goal = float(task["goal"])
+            if "timelimit_per_data" in task:
+                self.timelimit_per_data = float(task["timelimit_per_data"])
         except Exception as e:
             print(e)
             print(f"Taskを読み込めませんでした: {task_id}")

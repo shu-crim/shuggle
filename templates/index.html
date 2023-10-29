@@ -26,7 +26,7 @@
 
         {% if task_list_open|length > 0 %}
         <div class="container col-11">
-            <h2>開催中の<span style="color:#00a497">T</span>ask</h2>
+            <h2>{{name_contest}}開催中の<span style="color:#00a497">T</span>ask</h2>
         </div>
 
         <div class="container col-11">
@@ -54,7 +54,7 @@
 
         {% if task_list_closed|length > 0 %}
         <div class="container col-11">
-            <h2>開催期間終了後の<span style="color:#00a497">T</span>ask (提出・評価は可)</h2>
+            <h2>{{name_contest}}開催期間終了後の<span style="color:#00a497">T</span>ask (提出・評価は可)</h2>
         </div>
 
         <div class="container col-11">
@@ -80,6 +80,34 @@
 
         <br>
 
+        {% if task_list_quest|length > 0 %}
+        <div class="container col-11">
+            <h2>Quest <span style="color:#00a497">T</span>ask</h2>
+        </div>
+
+        <div class="container col-11">
+            <div class="row row-cols-auto">
+                {% for task in task_list_quest %}
+                <div class="col">
+                <div class="card text-white bg-dark mb-3" style="width: 18rem;">
+                    <a href="/{{task.id}}/task"><img src="/{{task.id}}/card.png" class="card-img-top"></a>
+                    <div class="card-body">
+                        <p class="card-text">{{task.explanation}}</p>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/task">タスク説明</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/board">評価結果</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/upload">提出</a></li>
+                    </ul>
+            </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <br>
+
         {% if task_list_prepare|length > 0 %}
         <div class="container col-11">
             <h2>準備中の<span style="color:#00a497">T</span>ask</h2>
@@ -94,6 +122,11 @@
                     <div class="card-body">
                         <p class="card-text">{{task.explanation}}</p>
                     </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/task">タスク説明</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/board">評価結果</a></li>
+                        <li class="list-group-item text-white bg-dark" style="padding-left:1rem;"><a class="link-info" href="/{{task.id}}/upload">提出</a></li>
+                    </ul>
                 </div>
                 </div>
                 {% endfor %}
