@@ -790,8 +790,22 @@ def get_taskcard(task_id):
 def task(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
+    
+    # タスク情報を読み込む
+    task:Task = Task(task_id)
 
-    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name)
+    # Goal表記
+    goal_text = GoalText(task.metric, task.goal)
+
+    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name, goal=goal_text)
+
+
+def GoalText(metric:Task.Metric, goal):
+    if metric == Task.Metric.Accuracy:
+        goal_text = f'正解率 {goal*100:.1f} % 以上'
+    elif metric == Task.Metric.MAE:
+        goal_text = f'平均絶対誤差 {goal} 以下'
+    return goal_text
 
 
 @app.route("/<task_id>/board")
@@ -824,7 +838,10 @@ def board(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    # Goal表記
+    goal_text = GoalText(task.metric, task.goal)
+
+    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
 
 @app.route("/<task_id>/log")
@@ -851,7 +868,10 @@ def log(task_id):
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    # Goal表記
+    goal_text = GoalText(task.metric, task.goal)
+
+    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
