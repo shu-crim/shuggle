@@ -82,6 +82,18 @@
                             document.getElementById('input-pass-user-id').value = user_id;
                             document.getElementById('input-pass-user-key').value = user_key;
                         
+                            // 提出タスクテーブルを挿入
+                            var request_task_table = new XMLHttpRequest();
+                            request_task_table.open("GET", "/my-task-table/" + user_id + "/" + user_key, true);
+                            request_task_table.onreadystatechange = function() {
+                                if (request_task_table.readyState == 4 && request_task_table.status == 200) {
+                                    //受信完了時の処理
+                                    var table_html = document.createTextNode(decodeURI(request_task_table.responseText));
+                                    document.getElementById('task-table').appendChild(stringToHTML(table_html.data));
+                                }
+                            }
+                            request_task_table.send("");
+
                             // 提出テーブルを挿入
                             var request_table = new XMLHttpRequest();
                             request_table.open("GET", "/submit-table/" + user_id + "/" + user_key, true);
@@ -242,6 +254,12 @@
         </div>
 
         <br>
+
+        <div class="container col-11">
+            <h2>提出した<span style="color:#00a497">T</span>ask一覧</h2>
+        </div>
+        <div class="container col-11" id="task-table">
+        </div>
 
         <div class="container col-11">
             <h2>これまでの提出一覧</h2>
