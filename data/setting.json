@@ -1,5 +1,8 @@
 {
     "admin": {
         "email": "hoge@hoge.hoge"
+    },
+    "name": {
+        "contest": "コンテスト"
     }
 }

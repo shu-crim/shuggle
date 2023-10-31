@@ -202,8 +202,10 @@ def GetUserStats(task_id) -> {}:
                     if len(raw) < 13:
                         continue
                 elif metric == Task.Metric.MAE:
-                    if len(raw) < 6:
+                    if len(raw) < 7:
                         continue
+                else:
+                    print("不正なmetric指定:", metric)
 
                 try:
                     dt = datetime.datetime.strptime(raw[0] + " " + raw[1], "%Y/%m/%d %H:%M:%S")
@@ -235,6 +237,7 @@ def GetUserStats(task_id) -> {}:
                     stats[user_id].append(stats_read)
                 except Exception as e:
                     print(e)
+                    print("statsを読み込めませんでした。")
 
         # ひとつも読めなかった場合はキーを削除
         if len(stats[user_id]) == 0:
@@ -299,7 +302,31 @@ def menuHTML(page, task_id="", url_from=""):
     return Markup(html)
 
 
-def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=False, visible_invalid_result=False):
+def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
+    achieve = False
+    if metric == Task.Metric.Accuracy:
+        if evaluated_value >= goal:
+            achieve = True
+    elif metric == Task.Metric.MAE:
+        if evaluated_value <= goal:
+            achieve = True
+    
+    return ' style="color:#0dcaf0"' if achieve else ''
+
+
+def Achieve(metric:Task.Metric, goal, train, valid, test=None):
+    result = '<span style="color:#0dcaf0">★</span>'
+    if metric == Task.Metric.Accuracy:
+        if train < goal or valid < goal or (test is not None and test < goal):
+            result = ''
+    elif metric == Task.Metric.MAE:
+        if train > goal or valid > goal or (test is not None and test > goal):
+            result = ''
+
+    return result
+
+
+def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, message=False, memo=False, visible_invalid_result=False):
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
@@ -313,10 +340,11 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
             else:
                 return ""
         else:
-            html_temp += f'<td>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
-            html_temp += f'<td>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(metric, stats.train[2], goal_value)}>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid[2], goal_value)}>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
             if test:
-                html_temp += f'<td>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.test[2], goal_value)}>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+    
     elif metric == Task.Metric.MAE:
         if stats.train < 0:
             if visible_invalid_result:
@@ -325,10 +353,10 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
                 return ""
         else:
             try:
-                html_temp += f'<td>{stats.train:.3f}</td>'
-                html_temp += f'<td>{stats.valid:.3f}</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.train, goal_value)}>{stats.train:.3f}</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid, goal_value)}>{stats.valid:.3f}</td>'
                 if test:
-                    html_temp += f'<td>{stats.test:.3f}</td>'
+                    html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal_value)}>{stats.test:.3f}</td>'
             except:
                 html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
 
@@ -343,7 +371,7 @@ def CreateTableRow(stats, metric:Task.Metric, test=False, message=False, memo=Fa
     return html_user
 
 
-def CreateTable(stats_list, metric:Task.Metric, test=False, message=False, memo=False):
+def CreateTable(stats_list, metric:Task.Metric, goal=None, test=False, message=False, memo=False):
     def metricName(metric: Task.Metric):
         if metric == Task.Metric.Accuracy:
             return '正解率'
@@ -377,7 +405,7 @@ def CreateTable(stats_list, metric:Task.Metric, test=False, message=False, memo=
     html_table += "<tbody>"
 
     for stats in stats_list:
-        html_table += CreateTableRow(stats, metric, test=test, message=message, memo=memo)
+        html_table += CreateTableRow(stats, metric, goal, test=test, message=message, memo=memo)
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -397,14 +425,88 @@ def CreateInProcHtml(task_id):
     return inproc_text + '<br>'
 
 
+def CreateMyTaskTable(user_id) -> str:
+    INIT_ERROR = 100000000
+    submits = []
+
+    # user_idのstatsをTaskごとに取得
+    for task_id, task in TASK.items():
+        task:Task = task
+        stats_temp = GetUserStats(task_id)
+        if user_id in stats_temp:
+            min_error = INIT_ERROR
+            hold_submit:Submit = Submit()
+            hold_submit.task_id = task.id
+            hold_submit.task_name = task.name
+            hold_submit.metric = task.metric
+            hold_submit.task_type = task.type
+            hold_submit.goal = task.goal
+
+            for item in stats_temp[user_id]:
+                stats:Stats = item
+                error = min_error
+                if task.type == Task.TaskType.Contest:
+                    # コンテストではTestの成績ベストを選択
+                    if task.metric == Task.Metric.Accuracy:
+                        if stats.test[2] < 0:
+                            continue
+                        error = 1 - stats.test[2]
+                    elif task.metric == Task.Metric.MAE:
+                        if stats.test < 0:
+                            continue
+                        error = stats.test
+                elif task.type == Task.TaskType.Quest:
+                    # クエストではValidの成績ベストを選択
+                    if task.metric == Task.Metric.Accuracy:
+                        if stats.valid[2] < 0:
+                            continue
+                        error = 1 - stats.valid[2]
+                    elif task.metric == Task.Metric.MAE:
+                        if stats.valid < 0:
+                            continue
+                        error = stats.valid
+
+                if error < min_error:
+                    hold_submit.stats = item
+                    min_error = error
+                
+            if min_error != INIT_ERROR:
+                submits.append(hold_submit)
+
+    # 提出日時でソート
+    sorted_submits = sorted(submits, key=lambda x: x.stats.datetime, reverse=True)
+    
+    # 表のHTMLを作成
+    html_table = '<table class="table table-dark">'
+    html_table += "<thead><tr>"
+    html_table += "<th>提出日時</th>"
+    html_table += "<th>Task</th>"
+    html_table += "<th>Goal</th>"
+    html_table += "<th>train</th>"
+    html_table += "<th>valid</th>"
+    html_table += "<th>test</th>"
+    html_table += "</tr></thead>"
+    html_table += "<tbody>"
+
+    for submit in sorted_submits:
+        html_table += CreateSubmitTableRow(submit, goal=True, test=True, memo=False, message=False)
+
+    html_table += "</tbody>"
+    html_table += "</table>"
+
+    return html_table
+
+
 class Submit:
     stats: Stats
     task_id: str
     task_name: str
     metric: Task.Metric
+    task_type: Task.TaskType
+    goal: float
 
 
-def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False):
+def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=False, test=False, memo:bool=True, message:bool=True):
     try:
         html_submit = ""
         html_submit += f'<tr>'
@@ -413,33 +515,52 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False):
 
         html_temp = ""
         if submit.metric == Task.Metric.Accuracy:
+            if goal:
+                html_temp += f'<td>{submit.goal*100:.0f} &percnt; 以上 {Achieve(submit.metric, submit.goal, submit.stats.train[2], submit.stats.valid[2], submit.stats.test[2] if submit.task_type == Task.TaskType.Contest else None)}</td>'
             if submit.stats.train[0] < 0:
-                if  visible_invalid_data:
-                    html_temp += '<td>-</td><td>-</td>'
+                if visible_invalid_data:
+                    html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
                 else:
                     return ""
             else:
-                html_temp += f'<td>{submit.stats.train[2] * 100:.2f} &percnt;</td>' if submit.stats.train[0] + submit.stats.train[1] > 0 else '<td>0.00 &percnt;</td>'
-                html_temp += f'<td>{submit.stats.valid[2] * 100:.2f} &percnt;</td>' if submit.stats.valid[0] + submit.stats.valid[1] > 0 else '<td>0.00 &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.train[2], submit.goal)}>{submit.stats.train[2] * 100:.2f} &percnt;</td>' if submit.stats.train[0] + submit.stats.train[1] > 0 else '<td>0.00 &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.valid[2], submit.goal)}>{submit.stats.valid[2] * 100:.2f} &percnt;</td>' if submit.stats.valid[0] + submit.stats.valid[1] > 0 else '<td>0.00 &percnt;</td>'
+                if test:
+                    if submit.task_type == Task.TaskType.Quest:
+                        html_temp += '<td>-</td>'
+                    elif submit.task_type == Task.TaskType.Contest:
+                        html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.test[2], submit.goal)}>{submit.stats.test[2] * 100:.2f} &percnt;</td>' if submit.stats.test[0] + submit.stats.test[1] > 0 else '<td>0.00 &percnt;</td>'
+        
         elif submit.metric == Task.Metric.MAE:
+            if goal:
+                html_temp += f'<td>MAE {submit.goal:.1f} 以下 {Achieve(submit.metric, submit.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task_type == Task.TaskType.Contest else None)}</td>'
             try:
                 if submit.stats.train < 0:
                     if visible_invalid_data:
-                        html_temp += '<td>-</td><td>-</td>'
+                        html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
                     else:
                         return ""
                 else:
-                    html_temp += f'<td>{submit.stats.train:.3f}(MAE)</td>'
-                    html_temp += f'<td>{submit.stats.valid:.3f}(MAE)</td>'
+                    html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.train, submit.goal)}>{submit.stats.train:.3f}(MAE)</td>'
+                    html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.valid, submit.goal)}>{submit.stats.valid:.3f}(MAE)</td>'
+                    if test:
+                        if submit.task_type == Task.TaskType.Quest:
+                            html_temp += '<td>-</td>'
+                        elif submit.task_type == Task.TaskType.Contest:
+                            html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.test, submit.goal)}>{submit.stats.test:.3f}(MAE)</td>'
             except:
                 html_temp += '<td>-</td><td>-</td>'
 
         html_submit += html_temp
 
-        html_submit += f'<td>{submit.stats.memo}</td>'
-        html_submit += f'<td>{submit.stats.message}</td>'
+        if memo:
+            html_submit += f'<td>{submit.stats.memo}</td>'
+        if message:
+            html_submit += f'<td>{submit.stats.message}</td>'
+
         html_submit += f'</tr>'
-    except:
+    except Exception as e:
+        print(e)
         return ""
 
     return html_submit
@@ -458,6 +579,8 @@ def CreateSubmitTable(user_id) -> str:
                 submit.task_id = task.id
                 submit.task_name = task.name
                 submit.metric = task.metric
+                submit.task_type = task.type
+                submit.goal = task.goal
                 submits.append(submit)
 
     # 提出日時でソート
@@ -527,36 +650,34 @@ def get_pw(username):
 @app.route('/')
 def index():
     today = datetime.datetime.now()
+    task_list_quest = []
     task_list_open = []
     task_list_closed = []
     task_list_prepare = []
     for key, value in TASK.items():
-        if value.start_date <= today and value.end_date > today:
-            task_list_open.append(
-                {
-                    'id': key,
-                    'name': value.name,
-                    'explanation': value.explanation
-                }
-            )
-        if value.end_date <= today:
-            task_list_closed.append(
-                {
-                    'id': key,
-                    'name': value.name,
-                    'explanation': value.explanation
-                }
-            )
-        if value.start_date > today:
-            task_list_prepare.append(
-                {
-                    'id': key,
-                    'name': value.name,
-                    'explanation': value.explanation
-                }
-            )
+        task:Task = value
+        info = {
+            'id': key,
+            'name': task.name,
+            'explanation': task.explanation
+        }
+
+        if value.start_date <= today:
+            # スタート後
+            if task.type == Task.TaskType.Quest:
+                # Questはいつでも開かれている
+                task_list_quest.append(info)
+            elif task.type == Task.TaskType.Contest:
+                # Contestは開催期間により振り分け
+                if value.end_date > today:
+                    task_list_open.append(info)
+                else:
+                    task_list_closed.append(info)
+        else:
+            # スタート前
+            task_list_prepare.append(info)
     
-    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_prepare=task_list_prepare, menu=menuHTML(Page.HOME, url_from="/"))
+    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"], menu=menuHTML(Page.HOME, url_from="/"))
 
 
 @app.route('/favicon.ico')
@@ -706,6 +827,19 @@ def user():
         return render_template(f'user.html', user_name=new_name, update_user_data="true", message=message)
 
 
+@app.route('/my-task-table/<user_id>/<user_key>')
+def my_task_table(user_id, user_key):
+    # 認証
+    verified, user_data = VerifyIdAndKey(user_id, user_key)
+    if not verified:
+        return redirect(url_for('login'))
+    
+    # 提出Taskテーブルを作成
+    table_html = CreateMyTaskTable(user_id)
+
+    return table_html
+
+
 @app.route('/submit-table/<user_id>/<user_key>')
 def submit_table(user_id, user_key):
     # 認証
@@ -779,8 +913,22 @@ def get_taskcard(task_id):
 def task(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
+    
+    # タスク情報を読み込む
+    task:Task = Task(task_id)
 
-    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name)
+    # Goal表記
+    goal_text = GoalText(task.metric, task.goal)
+
+    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name, goal=goal_text)
+
+
+def GoalText(metric:Task.Metric, goal):
+    if metric == Task.Metric.Accuracy:
+        goal_text = f'正解率 {goal*100:.1f} % 以上'
+    elif metric == Task.Metric.MAE:
+        goal_text = f'平均絶対誤差 {goal} 以下'
+    return goal_text
 
 
 @app.route("/<task_id>/board")
@@ -808,12 +956,15 @@ def board(task_id):
     sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    # Goal表記
+    goal_text = GoalText(task.metric, task.goal)
+
+    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
 
 @app.route("/<task_id>/log")
@@ -835,12 +986,15 @@ def log(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id)
+    # Goal表記
+    goal_text = GoalText(task.metric, task.goal)
+
+    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
@@ -911,7 +1065,7 @@ def admin(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, test=True, message=True)
+    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal, test=True, message=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -936,7 +1090,7 @@ if __name__ == "__main__":
         try:
             # タスク情報を取得
             task:Task = Task(task_id)
-            print(f"found task: ({task_id}) {task.name} {task.explanation}")
+            print(f"found task: ({task_id}) {task.name}")
             TASK[task_id] = task
         except:
             continue

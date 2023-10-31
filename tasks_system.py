@@ -33,7 +33,7 @@ def UpdateTtimestamp(task_id):
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
-def read_dataset(path_json, answer_value_type=int, multi_data=False, data_type="image-3ch"):
+def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch):
     json_open = open(path_json, 'r', encoding='utf-8')
     dataset = json.load(json_open)
 
@@ -58,7 +58,7 @@ def read_dataset(path_json, answer_value_type=int, multi_data=False, data_type="
             else:
                 # 画像読み込み
                 filename = item["path"]
-                data.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), item["path"]))))
+                data = np.array(Image.open(os.path.join(os.path.dirname(path_json), item["path"])))
 
             input_data = np.array(data, dtype=data[0].dtype)
             input_data_list.append(input_data)
@@ -75,7 +75,7 @@ def read_dataset(path_json, answer_value_type=int, multi_data=False, data_type="
     return num_problem, filename_list, input_data_list, correct_list
 
 
-def evaluate(num_problem, input_data_list, func_recognition, answer_value_type):
+def evaluate(num_problem, input_data_list, func_recognition, answer_value_type, timelimit_per_data=PROC_TIMEOUT_SEC):
     total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
@@ -83,7 +83,7 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type):
         with Pool(processes=1) as p:
             for i in range(num_problem):
                 num_input_data = input_data_list[i].shape[0]
-                time_limit = PROC_TIMEOUT_SEC * (num_input_data + 20) if i == 0 else PROC_TIMEOUT_SEC * num_input_data # 初回のみオーバーヘッドを考慮してゆるめ
+                time_limit = timelimit_per_data * (num_input_data + 20) if i == 0 else timelimit_per_data * num_input_data # 初回のみオーバーヘッドを考慮してゆるめ
 
                 start_time = time.time()
                 apply_result = p.apply_async(func_recognition, (input_data_list[i],))
@@ -124,7 +124,7 @@ class Result:
         self.answer = answer
     
 
-def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_data=False, data_type="image-3ch"):
+def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch, contest:bool=False, timelimit_per_data=PROC_TIMEOUT_SEC):
     try:
         # ユーザ作成の処理を読み込む
         user_module = importlib.import_module(f"{USER_MODULE_DIR_NAME}.{task_id}.{module_name}")
@@ -147,7 +147,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         num_train, filename_list, input_data_list, correct_list = read_dataset(
             os.path.join(Task.TASKS_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
 
-        answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type)
+        answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
         if num_train == 0:
             return []
         for i in range(num_train):
@@ -159,25 +159,26 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
             os.path.join(Task.TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
-        answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type)
+        answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
         if num_valid == 0:
             return []
         for i in range(num_valid):
             result = Result(Task.DataType.valid, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
-        print(f'Valiid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
+        print(f'Valid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
 
         # test
-        num_test, filename_list, input_data_list, correct_list = read_dataset(
-            os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
-       
-        answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type)
-        if num_test == 0:
-            return []
-        for i in range(num_test):
-            result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i])
-            result_list.append(result)
-        print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, totla: {total_proc_time : .1f} s')
+        if contest:
+            num_test, filename_list, input_data_list, correct_list = read_dataset(
+                os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
+        
+            answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
+            if num_test == 0:
+                return []
+            for i in range(num_test):
+                result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i])
+                result_list.append(result)
+            print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, totla: {total_proc_time : .1f} s')
 
     except Exception as e:
         raise(e)
@@ -203,7 +204,12 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
         elif task.answer_value_type == Task.AnswerValueType.real:
             answer_value_type = float
 
-        result_list = evaluate3data(task_id, os.path.splitext(new_filename)[0], user_name, answer_value_type, task.multi_input_data, task.input_data_type) # 拡張子を除く
+        result_list = evaluate3data(
+            task_id, os.path.splitext(new_filename)[0], # 拡張子を除く
+            user_name, answer_value_type, task.multi_input_data,
+            task.input_data_type, True if task.type == Task.TaskType.Contest else False,
+            task.timelimit_per_data)
+
         proc_success = True
     except Exception as e:
         proc_success = False
@@ -243,10 +249,11 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                 if task.metric == Task.Metric.Accuracy:
                     num_data = num_true[data_type] + num_false[data_type]
                     output_csv_file.write(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}\n")
-                    print(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}")
+                    # print(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}")
                 elif task.metric == Task.Metric.MAE:
-                    num_data = len(abs_errors[data_type])
-                    output_csv_file.write(f"{data_type.name},{num_data},{np.average(np.array(abs_errors[data_type], float))}\n")
+                    if data_type in abs_errors:
+                        num_data = len(abs_errors[data_type])
+                        output_csv_file.write(f"{data_type.name},{num_data},{np.average(np.array(abs_errors[data_type], float))}\n")
 
             # 詳細
             output_csv_file.write("\n")
@@ -281,16 +288,25 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
         for data_type in Task.DataType:
             if task.metric == Task.Metric.Accuracy:
                 if proc_success:
-                    num_data = num_true[data_type] + num_false[data_type]
-                    output_csv_file.write(f"{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'},")
+                    if data_type in num_true and data_type in num_false:
+                        num_data = num_true[data_type] + num_false[data_type]
+                        output_csv_file.write(f"{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'},")
+                    else:
+                        output_csv_file.write(f"-,-,-,")
                 else:
                     output_csv_file.write(f"-,-,-,")
             elif task.metric == Task.Metric.MAE:
                 if proc_success:
-                    num_data = len(abs_errors[data_type])
-                    output_csv_file.write(f"{np.average(np.array(abs_errors[data_type], float))},")
+                    if data_type in abs_errors:
+                        num_data = len(abs_errors[data_type])
+                        if num_data > 0:
+                            output_csv_file.write(f"{np.average(np.array(abs_errors[data_type], float))},")
+                        else:
+                            output_csv_file.write("-,")
+                    else:
+                        output_csv_file.write("-,")
                 else:
-                    output_csv_file.write(f"-,")
+                    output_csv_file.write("-,")
 
         output_csv_file.write(f"{message},{memo}")
 
