@@ -58,7 +58,7 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, data_t
             else:
                 # 画像読み込み
                 filename = item["path"]
-                data.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), item["path"]))))
+                data = np.array(Image.open(os.path.join(os.path.dirname(path_json), item["path"])))
 
             input_data = np.array(data, dtype=data[0].dtype)
             input_data_list.append(input_data)
