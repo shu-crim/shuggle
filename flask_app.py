@@ -11,7 +11,7 @@ import datetime
 from enum import Enum
 import shutil
 
-from task import Task
+from task import Task, Stats
 
 
 OUTPUT_DIR = r"./output"
@@ -38,17 +38,6 @@ class UserData():
         self.pass_hash = pass_hash
         self.name = name
         self.key = key
-
-
-class Stats():
-    username : str
-    datetime : datetime
-    filename : str = ""
-    train : list = []
-    valid : list = []
-    test : list = []
-    message : str = ''
-    memo : str = ''
 
 
 class Page(Enum):
@@ -158,25 +147,8 @@ def UpdateUsersCsv(path:str, id:str, target:str, value:str) -> bool:
 
 
 def GetUserStats(task_id) -> {}:
-    def TransIntIntFloat(true_false_accuracy : list):
-        result = [0, 0, 0.0]
-        try:
-            result[0] = int(true_false_accuracy[0])
-            result[1] = int(true_false_accuracy[1])
-            result[2] = float(true_false_accuracy[2])
-        except:
-            return [-1, -1, -1] #評価不能は負値
-        return result
-
-    def TransFloat(num:str):
-        try:
-            result = float(num)
-        except:
-            return -1 #評価不能は負値
-        return result
-    
     # Task情報からmetricを読み込む
-    metric = Task(task_id).metric
+    task = Task(task_id)
     
     # ユーザ情報を読み込む
     users = ReadUsersCsv(USER_CSV_PATH)
@@ -197,49 +169,9 @@ def GetUserStats(task_id) -> {}:
                 if not line:
                     break
 
-                raw = line.rstrip(os.linesep).split(",")
-                if metric == Task.Metric.Accuracy:
-                    if len(raw) < 13:
-                        continue
-                elif metric == Task.Metric.MAE:
-                    if len(raw) < 7:
-                        continue
-                else:
-                    print("不正なmetric指定:", metric)
+                stats[user_id].append(Stats(line, user_name, task.metric, task.goal))
 
-                try:
-                    dt = datetime.datetime.strptime(raw[0] + " " + raw[1], "%Y/%m/%d %H:%M:%S")
-                    filename = raw[2]
-
-                    if metric == Task.Metric.Accuracy:
-                        train = TransIntIntFloat(raw[3:6])
-                        valid = TransIntIntFloat(raw[6:9])
-                        test = TransIntIntFloat(raw[9:12])
-                        message = raw[12]
-                        memo = raw[13] if len(raw) >= 14 else ""
-                    elif metric == Task.Metric.MAE:
-                        train = TransFloat(raw[3])
-                        valid = TransFloat(raw[4])
-                        test = TransFloat(raw[5])
-                        message = raw[6]
-                        memo = raw[7] if len(raw) >= 8 else ""
-
-                    # すべて読めたので保持
-                    stats_read = Stats()
-                    stats_read.username = user_name
-                    stats_read.datetime = dt
-                    stats_read.filename = filename
-                    stats_read.train = train
-                    stats_read.valid = valid
-                    stats_read.test = test
-                    stats_read.message = message
-                    stats_read.memo = memo
-                    stats[user_id].append(stats_read)
-                except Exception as e:
-                    print(e)
-                    print("statsを読み込めませんでした。")
-
-        # ひとつも読めなかった場合はキーを削除
+        # ひとつもstatsがなかった場合はキーを削除
         if len(stats[user_id]) == 0:
             stats.pop(user_id)
 
@@ -334,16 +266,16 @@ def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, messa
 
     html_temp = ""
     if metric == Task.Metric.Accuracy:
-        if stats.train[0] < 0:
+        if stats.train < 0:
             if visible_invalid_result:
                 html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
             else:
                 return ""
         else:
-            html_temp += f'<td{EvaluatedValueStyle(metric, stats.train[2], goal_value)}>{stats.train[2] * 100:.2f} %</td>' if stats.train[0] + stats.train[1] > 0 else '<td>0.00 %</td>'
-            html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid[2], goal_value)}>{stats.valid[2] * 100:.2f} %</td>' if stats.valid[0] + stats.valid[1] > 0 else '<td>0.00 %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(metric, stats.train, goal_value)}>{stats.train * 100:.2f} %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid, goal_value)}>{stats.valid * 100:.2f} %</td>'
             if test:
-                html_temp += f'<td{EvaluatedValueStyle(metric, stats.test[2], goal_value)}>{stats.test[2] * 100:.2f} %</td>' if stats.test[0] + stats.test[1] > 0 else '<td>0.00 %</td>'
+                html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal_value)}>{stats.test * 100:.2f} %</td>'
     
     elif metric == Task.Metric.MAE:
         if stats.train < 0:
@@ -371,7 +303,7 @@ def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, messa
     return html_user
 
 
-def CreateTable(stats_list, metric:Task.Metric, goal=None, test=False, message=False, memo=False):
+def CreateBoardTable(stats_list, metric:Task.Metric, goal=None, test=False, message=False, memo=False):
     def metricName(metric: Task.Metric):
         if metric == Task.Metric.Accuracy:
             return '正解率'
@@ -432,46 +364,21 @@ def CreateMyTaskTable(user_id) -> str:
     # user_idのstatsをTaskごとに取得
     for task_id, task in TASK.items():
         task:Task = task
-        stats_temp = GetUserStats(task_id)
-        if user_id in stats_temp:
-            min_error = INIT_ERROR
-            hold_submit:Submit = Submit()
-            hold_submit.task_id = task.id
-            hold_submit.task_name = task.name
-            hold_submit.metric = task.metric
-            hold_submit.task_type = task.type
-            hold_submit.goal = task.goal
+        user_stats = GetUserStats(task_id)
+        if user_id in user_stats:
+            stats = user_stats[user_id]
 
-            for item in stats_temp[user_id]:
-                stats:Stats = item
-                error = min_error
-                if task.type == Task.TaskType.Contest:
-                    # コンテストではTestの成績ベストを選択
-                    if task.metric == Task.Metric.Accuracy:
-                        if stats.test[2] < 0:
-                            continue
-                        error = 1 - stats.test[2]
-                    elif task.metric == Task.Metric.MAE:
-                        if stats.test < 0:
-                            continue
-                        error = stats.test
-                elif task.type == Task.TaskType.Quest:
-                    # クエストではValidの成績ベストを選択
-                    if task.metric == Task.Metric.Accuracy:
-                        if stats.valid[2] < 0:
-                            continue
-                        error = 1 - stats.valid[2]
-                    elif task.metric == Task.Metric.MAE:
-                        if stats.valid < 0:
-                            continue
-                        error = stats.valid
-
-                if error < min_error:
-                    hold_submit.stats = item
-                    min_error = error
-                
-            if min_error != INIT_ERROR:
-                submits.append(hold_submit)
+            # 表示最優先の成績を選択
+            best_stats = Stats.GetBestStats(stats)
+            if best_stats is not None:
+                submit:Submit = Submit()
+                submit.task_id = task.id
+                submit.task_name = task.name
+                submit.metric = task.metric
+                submit.task_type = task.type
+                submit.goal = task.goal
+                submit.stats = best_stats
+                submits.append(submit)
 
     # 提出日時でソート
     sorted_submits = sorted(submits, key=lambda x: x.stats.datetime, reverse=True)
@@ -516,20 +423,20 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
         html_temp = ""
         if submit.metric == Task.Metric.Accuracy:
             if goal:
-                html_temp += f'<td>{submit.goal*100:.0f} &percnt; 以上 {Achieve(submit.metric, submit.goal, submit.stats.train[2], submit.stats.valid[2], submit.stats.test[2] if submit.task_type == Task.TaskType.Contest else None)}</td>'
-            if submit.stats.train[0] < 0:
+                html_temp += f'<td>{submit.goal*100:.0f} &percnt; 以上 {Achieve(submit.metric, submit.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task_type == Task.TaskType.Contest else None)}</td>'
+            if submit.stats.train < 0:
                 if visible_invalid_data:
                     html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
                 else:
                     return ""
             else:
-                html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.train[2], submit.goal)}>{submit.stats.train[2] * 100:.2f} &percnt;</td>' if submit.stats.train[0] + submit.stats.train[1] > 0 else '<td>0.00 &percnt;</td>'
-                html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.valid[2], submit.goal)}>{submit.stats.valid[2] * 100:.2f} &percnt;</td>' if submit.stats.valid[0] + submit.stats.valid[1] > 0 else '<td>0.00 &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.train, submit.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.valid, submit.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
                 if test:
                     if submit.task_type == Task.TaskType.Quest:
                         html_temp += '<td>-</td>'
                     elif submit.task_type == Task.TaskType.Contest:
-                        html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.test[2], submit.goal)}>{submit.stats.test[2] * 100:.2f} &percnt;</td>' if submit.stats.test[0] + submit.stats.test[1] > 0 else '<td>0.00 &percnt;</td>'
+                        html_temp += f'<td{EvaluatedValueStyle(submit.metric, submit.stats.test[2], submit.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
         
         elif submit.metric == Task.Metric.MAE:
             if goal:
@@ -810,10 +717,12 @@ def user():
                 # パスワードを変更
                 password = request.form['inputPassword']
                 password_verify = request.form['inputPasswordVerify']
+
                 # 2つのパスワード入力の一致チェック
                 if password != password_verify:
                     message = '再入力したパスワードが一致していません。'
                     raise(ValueError())
+                
                 # パスワードをハッシュ化
                 pass_hash = generate_password_hash(password, salt_length=21)
                 success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'pass_hash', pass_hash)
@@ -918,17 +827,11 @@ def task(task_id):
     task:Task = Task(task_id)
 
     # Goal表記
-    goal_text = GoalText(task.metric, task.goal)
+    goal_text = Task.GoalText(task.metric, task.goal)
 
     return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name, goal=goal_text)
 
 
-def GoalText(metric:Task.Metric, goal):
-    if metric == Task.Metric.Accuracy:
-        goal_text = f'正解率 {goal*100:.1f} % 以上'
-    elif metric == Task.Metric.MAE:
-        goal_text = f'平均絶対誤差 {goal} 以下'
-    return goal_text
 
 
 @app.route("/<task_id>/board")
@@ -942,27 +845,24 @@ def board(task_id):
     # ユーザ成績を読み込む
     user_stats = GetUserStats(task_id)
 
-    # 辞書をリスト化してソート
-    latest_stats_list = []
-    for stats in user_stats.values():
-        # 各ユーザごとに最新の結果を抽出
-        for i in range(len(stats) - 1, -1, -1):
-            if task.metric == Task.Metric.Accuracy and stats[i].train[0] < 0:
-                continue
-            if task.metric == Task.Metric.MAE and stats[i].train < 0:
-                continue
-            latest_stats_list.append(stats[i])
-            break
-    sorted_stats_list = sorted(latest_stats_list, key=lambda x: x.datetime, reverse=True)
+    # ユーザごとに表示最優先の成績を選択
+    best_stats_every_user = []
+    for user_name, stats in user_stats.items():
+        best_stats = Stats.GetBestStats(stats)
+        if best_stats is not None:
+            best_stats_every_user.append(best_stats)
+
+    # 日付順にソート
+    sorted_stats_list = sorted(best_stats_every_user, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task.metric, task.goal)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
     # Goal表記
-    goal_text = GoalText(task.metric, task.goal)
+    goal_text = Task.GoalText(task.metric, task.goal)
 
     return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
@@ -986,13 +886,13 @@ def log(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task.metric, task.goal)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
     # Goal表記
-    goal_text = GoalText(task.metric, task.goal)
+    goal_text = Task.GoalText(task.metric, task.goal)
 
     return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
@@ -1065,7 +965,7 @@ def admin(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateTable(sorted_stats_list, task.metric, task.goal, test=True, message=True)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task.metric, task.goal, test=True, message=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
