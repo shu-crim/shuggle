@@ -4,6 +4,7 @@ import datetime
 from enum import Enum
 import json
 from functools import cmp_to_key
+from flask import Markup
 
 
 class Task:
@@ -104,10 +105,10 @@ class Task:
     @staticmethod
     def GoalText(metric:Metric, goal):
         if metric == Task.Metric.Accuracy:
-            goal_text = f'正解率 {goal*100:.1f} % 以上'
+            goal_text = f'正解率 <span style="color:#0dcaf0">{goal*100:.1f}</span> % 以上'
         elif metric == Task.Metric.MAE:
-            goal_text = f'平均絶対誤差 {goal} 以下'
-        return goal_text
+            goal_text = f'平均絶対誤差 <span style="color:#0dcaf0">{goal}</span> 以下'
+        return Markup(goal_text)
 
 
 class Stats:

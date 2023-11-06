@@ -832,8 +832,6 @@ def task(task_id):
     return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name, goal=goal_text)
 
 
-
-
 @app.route("/<task_id>/board")
 def board(task_id):
     if not task_id in TASK:
