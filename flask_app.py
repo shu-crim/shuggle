@@ -260,29 +260,32 @@ def Achieve(metric:Task.Metric, goal, train, valid, test=None):
     return result
 
 
-def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
+def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
-    html_user += f'<td>{stats.datetime}</td>'
+    if unlock:
+        html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
+    else:
+        html_user += f'<td>{stats.datetime}</td>'
 
     html_temp = ""
-    if metric == Task.Metric.Accuracy:
+    if task.metric == Task.Metric.Accuracy:
         if stats.train < 0:
             if visible_invalid_result:
                 html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
             else:
                 return ""
         else:
-            html_temp += f'<td{EvaluatedValueStyle(metric, stats.train, goal_value)}>{stats.train * 100:.2f} %</td>'
-            html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid, goal_value)}>{stats.valid * 100:.2f} %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.train, task.goal)}>{stats.train * 100:.2f} %</td>'
+            html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.valid, task.goal)}>{stats.valid * 100:.2f} %</td>'
             if test:
                 if unlock:
-                    html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal_value)}>{stats.test * 100:.2f} %</td>'
+                    html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test * 100:.2f} %</td>'
                 else:
                     html_temp += f'<td>?</td>'
     
-    elif metric == Task.Metric.MAE:
+    elif task.metric == Task.Metric.MAE:
         if stats.train < 0:
             if visible_invalid_result:
                 html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
@@ -290,11 +293,11 @@ def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, messa
                 return ""
         else:
             try:
-                html_temp += f'<td{EvaluatedValueStyle(metric, stats.train, goal_value)}>{stats.train:.3f}</td>'
-                html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid, goal_value)}>{stats.valid:.3f}</td>'
+                html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.train, task.goal)}>{stats.train:.3f}</td>'
+                html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.valid, task.goal)}>{stats.valid:.3f}</td>'
                 if test:
                     if unlock:
-                        html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal_value)}>{stats.test:.3f}</td>'
+                        html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test:.3f}</td>'
                     else:
                         html_temp += f'<td>?</td>'
             except:
@@ -311,7 +314,7 @@ def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, messa
     return html_user
 
 
-def CreateBoardTable(stats_list, metric:Task.Metric, goal=None, test=False, message=False, memo=False, unlock=False):
+def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=False, unlock=False):
     def metricName(metric: Task.Metric):
         if metric == Task.Metric.Accuracy:
             return '正解率'
@@ -328,12 +331,12 @@ def CreateBoardTable(stats_list, metric:Task.Metric, goal=None, test=False, mess
     num_col += 1
     html_table += f"<th id=\"th-{num_col}\">提出日時</th>"
     num_col += 1
-    html_table += f"<th id=\"th-{num_col}\">train(配布){metricName(metric)}</th>"
+    html_table += f"<th id=\"th-{num_col}\">train(配布){metricName(task.metric)}</th>"
     num_col += 1
-    html_table += f"<th id=\"th-{num_col}\">valid{metricName(metric)}</th>"
+    html_table += f"<th id=\"th-{num_col}\">valid{metricName(task.metric)}</th>"
     num_col += 1
     if test:
-        html_table += f"<th id=\"th-{num_col}\">test{metricName(metric)}</th>"
+        html_table += f"<th id=\"th-{num_col}\">test{metricName(task.metric)}</th>"
         num_col += 1
     if memo:
         html_table += f"<th id=\"th-{num_col}\">メモ</th>"
@@ -345,7 +348,7 @@ def CreateBoardTable(stats_list, metric:Task.Metric, goal=None, test=False, mess
     html_table += "<tbody>"
 
     for stats in stats_list:
-        html_table += CreateTableRow(stats, metric, goal, test=test, message=message, memo=memo, unlock=unlock)
+        html_table += CreateTableRow(stats, task, test=test, message=message, memo=memo, unlock=unlock)
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -931,7 +934,7 @@ def board(task_id):
                 unlock = True
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task.metric, task.goal, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -961,7 +964,7 @@ def log(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task.metric, task.goal)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
@@ -1040,7 +1043,7 @@ def admin(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task.metric, task.goal, test=True, message=True)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task, test=True, message=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
