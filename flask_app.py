@@ -277,7 +277,10 @@ def CreateTableRow(stats, metric:Task.Metric, goal_value=None, test=False, messa
             html_temp += f'<td{EvaluatedValueStyle(metric, stats.train, goal_value)}>{stats.train * 100:.2f} %</td>'
             html_temp += f'<td{EvaluatedValueStyle(metric, stats.valid, goal_value)}>{stats.valid * 100:.2f} %</td>'
             if test:
-                html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal_value)}>{stats.test * 100:.2f} %</td>'
+                if unlock:
+                    html_temp += f'<td{EvaluatedValueStyle(metric, stats.test, goal_value)}>{stats.test * 100:.2f} %</td>'
+                else:
+                    html_temp += f'<td>?</td>'
     
     elif metric == Task.Metric.MAE:
         if stats.train < 0:

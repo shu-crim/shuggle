@@ -9,8 +9,8 @@
         "metric": "Accuracy",
         "input_data_type": "image-3ch",
         "multi_input_data": false,
-        "type": "quest",
-        "goal": 0.4,
+        "type": "contest",
+        "goal": 0.2,
         "timelimit_per_data": 1.0
     }
 }
