@@ -113,6 +113,7 @@ class Task:
 
 class Stats:
     username : str
+    userid : str
     datetime : datetime
     filename : str = ""
     train : list = []
@@ -124,8 +125,9 @@ class Stats:
     goal: float
 
     # ユーザ成績のcsvファイルに書かれた1行の成績記録をもとにstatsを読み取る
-    def __init__(self, user_stats_line:str, username, metric:Task.Metric, goal:float) -> None:
+    def __init__(self, user_stats_line:str, username, metric:Task.Metric, goal:float, userid) -> None:
         self.username = username
+        self.userid = userid
         self.metric = metric
         self.goal = goal
 
