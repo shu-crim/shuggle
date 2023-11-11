@@ -382,11 +382,6 @@ def CreateMyTaskTable(user_id) -> str:
             best_stats = Stats.GetBestStats(stats)
             if best_stats is not None:
                 submit:Submit = Submit()
-                submit.task_id = task.id
-                submit.task_name = task.name
-                submit.metric = task.metric
-                submit.task_type = task.type
-                submit.goal = task.goal
                 submit.stats = best_stats
                 submit.task = task
                 submits.append(submit)
@@ -428,17 +423,17 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
         html_submit += f'<td><a href="/{submit.task.id}/task" class="link-info">{submit.task.name}</a></td>'
 
         html_temp = ""
-        if submit.metric == Task.Metric.Accuracy:
+        if submit.task.metric == Task.Metric.Accuracy:
             if goal:
-                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task.metric, submit.task.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task.type == Task.TaskType.Contest else None)}</td>'
+                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task.metric, submit.task.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task.type == Task.TaskType.Contest else None)}</td>'
             if submit.stats.train < 0:
                 if visible_invalid_data:
                     html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
                 else:
                     return ""
             else:
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
                 if test:
                     if submit.task.type == Task.TaskType.Quest:
                         html_temp += '<td>-</td>'
@@ -447,7 +442,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
                         if AchieveGoal(submit.task, submit.stats):
                             # Questであればいつでも、Contestであれば期間終了後にロック解除
                             if datetime.datetime.now() >= submit.task.end_date: 
-                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test[2], submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
+                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
                                 unlock = True
                         if not unlock:
                             html_temp += f'<td>?</td>'
@@ -504,11 +499,6 @@ def CreateSubmitTable(user_id) -> str:
             for item in stats_temp[user_id]:
                 submit: Submit = Submit()
                 submit.stats = item
-                submit.task_id = task.id
-                submit.task_name = task.name
-                submit.metric = task.metric
-                submit.task_type = task.type
-                submit.goal = task.goal
                 submit.task = task
                 submits.append(submit)
 
