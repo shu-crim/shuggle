@@ -12,7 +12,7 @@ from multiprocessing import Pool, TimeoutError
 import traceback
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import json
-from task import Task
+from task import Task, Log
 import chardet
 
 
@@ -319,6 +319,9 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     # タイムスタンプ更新
     UpdateTtimestamp(task_id)
 
+    # Log
+    Log.write(f'{new_filename} on {task_id} {"was" if proc_success else "was not" } completed.')
+
 
 def GetEncodingType(file):
     with open(file, 'rb') as f:
@@ -358,7 +361,6 @@ def main():
                     now = datetime.datetime.now()
                     new_filename = user_name + "_" + task_id + "_" + now.strftime('%Y%m%d_%H%M%S_') + os.path.basename(path)
                     try:
-                        #shutil.move(path, os.path.join(dir_user_module, new_filename))
                         encoding = GetEncodingType(path)
                         with open(path, 'r', encoding=encoding) as f:
                             content = f.read()
@@ -398,6 +400,9 @@ def main():
 
                     # タイムスタンプ更新
                     UpdateTtimestamp(task_id)
+
+                    # Log
+                    Log.write(f'{user_name} submit {new_filename} to {task_id}, file movement succeeded, then the proccess started.')
 
                     # ファイルの移動に成功したらプロセス生成して処理開始
                     proccess.submit(ProcOneUser, task_id, user_name, new_filename, now, memo)

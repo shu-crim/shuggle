@@ -5,6 +5,7 @@ from enum import Enum
 import json
 from functools import cmp_to_key
 from flask import Markup
+import glob
 
 
 class Task:
@@ -291,5 +292,57 @@ class Stats:
         return best_stats
 
 
+class Log:
+    LOG_DIR = r"./data/log"
 
+    @staticmethod
+    def write(log:str) -> bool:
+        if not os.path.exists(Log.LOG_DIR):
+            os.makedirs(Log.LOG_DIR)
+
+        now = datetime.datetime.now()
+        log_file_neme = now.strftime('log_%Y%m%d.log')
+
+        success = False
+        for i in range(1000):
+            try:
+                with open(os.path.join(Log.LOG_DIR, log_file_neme), "a", encoding='utf-8') as f:
+                    f.write(now.strftime('%Y-%m-%d %H:%M:%S,'))
+                    f.write(log + '\n')
+                    success = True
+            except:
+                print("Retry write log")
+                continue
+            break
+
+        return success
+
+
+    @staticmethod
+    def createTable() -> str:
+        # 表のHTMLを作成
+        html_table = '<table class="table table-dark">'
+        html_table += "<thead><tr>"
+        html_table += "<th>Datetime</th>"
+        html_table += "<th>Log</th>"
+        html_table += "</tr></thead>"
+        html_table += "<tbody>"
+
+        paths = glob.glob(os.path.join(Log.LOG_DIR, "*.log"))
+        for path in paths:
+            lines = []
+            try:
+                with open(path, encoding="utf-8") as f:
+                    lines = f.readlines()
+            except:
+                print(f"cannot open {path}")
+
+            for line in lines:
+                datetime = line.split(',')[0]
+                html_table += f"<tr><td>{datetime}</td><td>{line.replace(datetime+',', '')}</td></tr>"
+
+        html_table += "</tbody>"
+        html_table += "</table>"
+
+        return html_table
         

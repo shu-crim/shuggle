@@ -11,7 +11,7 @@ import datetime
 from enum import Enum
 import shutil
 
-from task import Task, Stats
+from task import Task, Stats, Log
 
 
 OUTPUT_DIR = r"./output"
@@ -525,6 +525,58 @@ def CreateSubmitTable(user_id) -> str:
 
     for submit in sorted_submits:
         html_table += CreateSubmitTableRow(submit, True)
+
+    html_table += "</tbody>"
+    html_table += "</table>"
+
+    return html_table
+
+
+def CreateUserTable() -> str:
+    # 表のHTMLを作成
+    html_table = '<table class="table table-dark">'
+    html_table += "<thead><tr>"
+    html_table += "<th>ID</th>"
+    html_table += "<th>Name</th>"
+    html_table += "<th>Email</th>"
+    html_table += "<th>Num Submit</th>"
+    html_table += "<th>Latest Submit</th>"
+    html_table += "<th>Task</th>"
+    html_table += "</tr></thead>"
+    html_table += "<tbody>"
+
+    # ユーザ情報を読み込む
+    users = ReadUsersCsv(USER_CSV_PATH)
+
+    for user_id, user in users.items():
+        user_data:UserData = user
+
+        # 最新の提出を抽出
+        latest_datetime:datetime.datetime = datetime.datetime(1984, 4, 22)
+        latest_submit_task:Task = None
+        num_submit = 0
+        for task_id, task in TASK.items():
+            stats_temp = GetUserStats(task_id)
+            if not user_id in stats_temp:
+                continue
+            num_submit += len(stats_temp[user_id])
+            for item in stats_temp[user_id]:
+                stats:Stats = item
+                if stats.datetime > latest_datetime:
+                    latest_datetime = stats.datetime
+                    latest_submit_task = task
+
+        html_table += "<tr>"
+        html_table += f"<td>{user_data.id}</td>"
+        html_table += f"<td>{user_data.name}</td>"
+        html_table += f"<td>{user_data.email}</td>"
+        html_table += f"<td>{num_submit}</td>"
+        html_table += f"<td>{latest_datetime if latest_submit_task is not None else '-'}</td>"
+        if latest_submit_task is not None:
+            html_table += f'<td><a href="/{latest_submit_task.id}/task" class="link-info">{latest_submit_task.name}</a></td>'
+        else:
+            html_table += '<td>-</td>'
+        html_table += "</tr>"
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -1058,6 +1110,19 @@ def admin(task_id):
     inproc_text = CreateInProcHtml(task_id)
 
     return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col)
+
+
+@app.route('/admin')
+def manage():
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not admin:
+        return redirect(url_for('index'))
+
+    user_table = CreateUserTable()
+    log_table = Log.createTable()
+
+    return render_template('admin.html', user_table=Markup(user_table), log_table=Markup(log_table))
 
 
 if __name__ == "__main__":
