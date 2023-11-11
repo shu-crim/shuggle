@@ -11,7 +11,7 @@ import datetime
 from enum import Enum
 import shutil
 
-from task import Task, Stats
+from task import Task, Stats, Log
 
 
 OUTPUT_DIR = r"./output"
@@ -55,10 +55,6 @@ class Page(Enum):
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 2MB
 app.config['SECRET_KEY'] = 'secret key here'
-auth = HTTPDigestAuth()
-auth_users = {
-    "root": "password",
-}
 
 
 def ReadUsersCsv(path:str):
@@ -180,7 +176,7 @@ def GetUserStats(task_id) -> {}:
     return stats
 
 
-def menuHTML(page, task_id="", url_from=""):
+def menuHTML(page, task_id="", url_from="", admin=False):
     html = """
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
@@ -195,31 +191,35 @@ def menuHTML(page, task_id="", url_from=""):
     if page != Page.HOME:
         html += """
                         <li class="nav-item">
-                            <a class="nav-link{1} href="/{6}/task">{0}</a>
+                            <a class="nav-link{1} href="/{5}/task">{0}</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link{2} href="/{6}/board">評価結果</a>
+                            <a class="nav-link{2} href="/{5}/board">評価結果</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link{3} href="/{6}/log">履歴</a>
+                            <a class="nav-link{3} href="/{5}/log">履歴</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link{4} href="/{6}/upload">提出</a>
+                            <a class="nav-link{4} href="/{5}/upload">提出</a>
                         </li>
-                        {5}
         """.format(
             TASK[task_id].name,
             " active\" aria-current=\"page\"" if page == Page.TASK else "\"",
             " active\" aria-current=\"page\"" if page == Page.BOARD else "\"",
             " active\" aria-current=\"page\"" if page == Page.LOG else "\"",
             " active\" aria-current=\"page\"" if page == Page.UPLOAD else "\"",
-            """
-                        <li class="nav-item">
-                            <a class="nav-link active">管理者</a>
-                        </li>
-            """ if page == Page.ADMIN else "",
             task_id
         )
+
+        if admin:
+            html += """
+                        <li class="nav-item">
+                            <a class="nav-link{0} href="/{1}/admin">管理者</a>
+                        </li>
+            """.format(
+                " active\" aria-current=\"page\"" if page == Page.ADMIN else "\"",
+                task_id
+            )
 
     html += f"""
                     </ul>
@@ -280,10 +280,13 @@ def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visi
             html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.train, task.goal)}>{stats.train * 100:.2f} %</td>'
             html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.valid, task.goal)}>{stats.valid * 100:.2f} %</td>'
             if test:
-                if unlock:
-                    html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test * 100:.2f} %</td>'
+                if task.type == Task.TaskType.Contest:
+                    if unlock:
+                        html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test * 100:.2f} %</td>'
+                    else:
+                        html_temp += f'<td>?</td>'
                 else:
-                    html_temp += f'<td>?</td>'
+                    html_temp += f'<td>-</td>'
     
     elif task.metric == Task.Metric.MAE:
         if stats.train < 0:
@@ -296,10 +299,13 @@ def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visi
                 html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.train, task.goal)}>{stats.train:.3f}</td>'
                 html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.valid, task.goal)}>{stats.valid:.3f}</td>'
                 if test:
-                    if unlock:
-                        html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test:.3f}</td>'
+                    if task.type == Task.TaskType.Contest:
+                        if unlock:
+                            html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test:.3f}</td>'
+                        else:
+                            html_temp += f'<td>?</td>'
                     else:
-                        html_temp += f'<td>?</td>'
+                        html_temp += f'<td>-</td>'
             except:
                 html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
 
@@ -382,11 +388,6 @@ def CreateMyTaskTable(user_id) -> str:
             best_stats = Stats.GetBestStats(stats)
             if best_stats is not None:
                 submit:Submit = Submit()
-                submit.task_id = task.id
-                submit.task_name = task.name
-                submit.metric = task.metric
-                submit.task_type = task.type
-                submit.goal = task.goal
                 submit.stats = best_stats
                 submit.task = task
                 submits.append(submit)
@@ -428,17 +429,17 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
         html_submit += f'<td><a href="/{submit.task.id}/task" class="link-info">{submit.task.name}</a></td>'
 
         html_temp = ""
-        if submit.metric == Task.Metric.Accuracy:
+        if submit.task.metric == Task.Metric.Accuracy:
             if goal:
-                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task.metric, submit.task.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task.type == Task.TaskType.Contest else None)}</td>'
+                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task.metric, submit.task.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task.type == Task.TaskType.Contest else None)}</td>'
             if submit.stats.train < 0:
                 if visible_invalid_data:
                     html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
                 else:
                     return ""
             else:
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
                 if test:
                     if submit.task.type == Task.TaskType.Quest:
                         html_temp += '<td>-</td>'
@@ -447,7 +448,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
                         if AchieveGoal(submit.task, submit.stats):
                             # Questであればいつでも、Contestであれば期間終了後にロック解除
                             if datetime.datetime.now() >= submit.task.end_date: 
-                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test[2], submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
+                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
                                 unlock = True
                         if not unlock:
                             html_temp += f'<td>?</td>'
@@ -504,11 +505,6 @@ def CreateSubmitTable(user_id) -> str:
             for item in stats_temp[user_id]:
                 submit: Submit = Submit()
                 submit.stats = item
-                submit.task_id = task.id
-                submit.task_name = task.name
-                submit.metric = task.metric
-                submit.task_type = task.type
-                submit.goal = task.goal
                 submit.task = task
                 submits.append(submit)
 
@@ -529,6 +525,58 @@ def CreateSubmitTable(user_id) -> str:
 
     for submit in sorted_submits:
         html_table += CreateSubmitTableRow(submit, True)
+
+    html_table += "</tbody>"
+    html_table += "</table>"
+
+    return html_table
+
+
+def CreateUserTable() -> str:
+    # 表のHTMLを作成
+    html_table = '<table class="table table-dark">'
+    html_table += "<thead><tr>"
+    html_table += "<th>ID</th>"
+    html_table += "<th>Name</th>"
+    html_table += "<th>Email</th>"
+    html_table += "<th>Num Submit</th>"
+    html_table += "<th>Latest Submit</th>"
+    html_table += "<th>Task</th>"
+    html_table += "</tr></thead>"
+    html_table += "<tbody>"
+
+    # ユーザ情報を読み込む
+    users = ReadUsersCsv(USER_CSV_PATH)
+
+    for user_id, user in users.items():
+        user_data:UserData = user
+
+        # 最新の提出を抽出
+        latest_datetime:datetime.datetime = datetime.datetime(1984, 4, 22)
+        latest_submit_task:Task = None
+        num_submit = 0
+        for task_id, task in TASK.items():
+            stats_temp = GetUserStats(task_id)
+            if not user_id in stats_temp:
+                continue
+            num_submit += len(stats_temp[user_id])
+            for item in stats_temp[user_id]:
+                stats:Stats = item
+                if stats.datetime > latest_datetime:
+                    latest_datetime = stats.datetime
+                    latest_submit_task = task
+
+        html_table += "<tr>"
+        html_table += f"<td>{user_data.id}</td>"
+        html_table += f"<td>{user_data.name}</td>"
+        html_table += f"<td>{user_data.email}</td>"
+        html_table += f"<td>{num_submit}</td>"
+        html_table += f"<td>{latest_datetime if latest_submit_task is not None else '-'}</td>"
+        if latest_submit_task is not None:
+            html_table += f'<td><a href="/{latest_submit_task.id}/task" class="link-info">{latest_submit_task.name}</a></td>'
+        else:
+            html_table += '<td>-</td>'
+        html_table += "</tr>"
 
     html_table += "</tbody>"
     html_table += "</table>"
@@ -579,10 +627,13 @@ def VerifyByCookie(request):
             verified, user_data = VerifyIdAndKey(user_id, user_key)
             if not verified:
                 raise(ValueError())
+            admin = True if SETTING["admin"]["email"] == user_data.email else False                
     except:
         verified = False
+        user_data = None
+        admin = False
 
-    return verified, user_id
+    return verified, user_data, admin
 
 
 def AchieveGoal(task:Task, stats:Stats):
@@ -602,15 +653,11 @@ def AchieveGoal(task:Task, stats:Stats):
     return True
 
 
-@auth.get_password
-def get_pw(username):
-    if username in auth_users:
-        return auth_users.get(username)
-    return None
-
-
 @app.route('/')
 def index():
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+
     today = datetime.datetime.now()
     task_list_quest = []
     task_list_open = []
@@ -637,7 +684,8 @@ def index():
                     task_list_closed.append(info)
         else:
             # スタート前
-            task_list_prepare.append(info)
+            if admin:
+                task_list_prepare.append(info)
     
     return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"], menu=menuHTML(Page.HOME, url_from="/"))
 
@@ -885,14 +933,17 @@ def get_taskcard(task_id):
 def task(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
-    
+
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+
     # タスク情報を読み込む
     task:Task = Task(task_id)
 
     # Goal表記
     goal_text = Task.GoalText(task.metric, task.goal)
 
-    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task"), task_name=TASK[task_id].name, goal=goal_text)
+    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin), task_name=TASK[task_id].name, goal=goal_text)
 
 
 @app.route("/<task_id>/board", methods=['GET'])
@@ -901,7 +952,7 @@ def board(task_id):
         return redirect(url_for('index'))
 
     # ユーザ認証
-    verified, user_id = VerifyByCookie(request)
+    verified, user_data, admin = VerifyByCookie(request)
     
     # タスク情報を読み込む
     task:Task = Task(task_id)
@@ -916,7 +967,7 @@ def board(task_id):
         best_stats:Stats = Stats.GetBestStats(stats)
         if best_stats is not None:
             best_stats_every_user.append(best_stats)
-            if verified and best_stats.userid == user_id:
+            if verified and best_stats.userid == user_data.id:
                 my_stats = best_stats
 
     # 日付順にソート
@@ -942,7 +993,7 @@ def board(task_id):
     # Goal表記
     goal_text = Task.GoalText(task.metric, task.goal)
 
-    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
+    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
 
 @app.route("/<task_id>/log")
@@ -950,6 +1001,9 @@ def log(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
     
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+
     # タスク情報を読み込む
     task:Task = Task(task_id)
 
@@ -972,7 +1026,7 @@ def log(task_id):
     # Goal表記
     goal_text = Task.GoalText(task.metric, task.goal)
 
-    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log"), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
+    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
@@ -1020,13 +1074,20 @@ def upload_file(task_id):
                 except:
                     msg = "アップロードに失敗しました。"
 
-    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload"), url_from=f"/{task_id}/upload")
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+
+    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin), url_from=f"/{task_id}/upload")
   
 
 @app.route('/<task_id>/admin')
-@auth.login_required
 def admin(task_id):
     if not task_id in TASK:
+        return redirect(url_for('index'))
+    
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not admin:
         return redirect(url_for('index'))
     
     # タスク情報を読み込む
@@ -1043,12 +1104,25 @@ def admin(task_id):
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task, test=True, message=True)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task, test=True, message=True, unlock=True)
 
     # 評価中の表示
     inproc_text = CreateInProcHtml(task_id)
 
-    return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin"), inproc_text=Markup(inproc_text), num_col=num_col)
+    return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col)
+
+
+@app.route('/admin')
+def manage():
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not admin:
+        return redirect(url_for('index'))
+
+    user_table = CreateUserTable()
+    log_table = Log.createTable()
+
+    return render_template('admin.html', user_table=Markup(user_table), log_table=Markup(log_table))
 
 
 if __name__ == "__main__":
