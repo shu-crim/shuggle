@@ -657,6 +657,10 @@ def VerifyIdAndKey(user_id, user_key):
 
 
 def VerifyByCookie(request):
+    verified = False
+    user_data = None
+    admin = False
+
     try:
         user_info = request.cookies.get(COOKIE_KEY)
         if user_info is not None:
@@ -668,9 +672,7 @@ def VerifyByCookie(request):
                 raise(ValueError())
             admin = True if SETTING["admin"]["email"] == user_data.email else False                
     except:
-        verified = False
-        user_data = None
-        admin = False
+        print("cookieによる認証に失敗しました。")
 
     return verified, user_data, admin
 
