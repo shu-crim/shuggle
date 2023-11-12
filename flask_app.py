@@ -584,6 +584,45 @@ def CreateUserTable() -> str:
     return html_table
 
 
+def CreateTaskTable(tasks) -> str:
+    # 表のHTMLを作成
+    html_table = '<table class="table table-dark">'
+    html_table += "<thead><tr>"
+    html_table += "<th>ID</th>"
+    html_table += "<th>Name</th>"
+    html_table += "<th>開始日</th>"
+    html_table += "<th>終了日</th>"
+    html_table += "<th>Type</th>"
+    html_table += "<th>Metric</th>"
+    html_table += "<th>Goal</th>"
+    html_table += "<th>制限時間[s/data]</th>"
+    html_table += "<th>変更</th>"
+    html_table += "</tr></thead>"
+    html_table += "<tbody>"
+
+    for task_id, item in tasks.items():
+        task:Task = item
+        html_table += f'<form method="POST">'
+        html_table += f'<input type="hidden" name="task-id" value="{task_id}">'
+        html_table += f"<tr>"
+        html_table += f"<td>{task.id}</td>"
+        html_table += f"<td>{task.name}</td>"
+        html_table += f'<td><input type="date" name="start-date" value="{task.start_date.date()}" class="bg-dark text-white"></td>'
+        html_table += f'<td><input type="date" name="end-date" value="{task.end_date.date()}" class="bg-dark text-white"></td>'
+        html_table += f"<td>{task.type.name}</td>"
+        html_table += f"<td>{task.metric.name}</td>"
+        html_table += f'<td><input type="number" name="goal" value="{task.goal}" step="0.1" class="bg-dark text-white"></td>'
+        html_table += f'<td><input type="number" name="timelimit-per-data" value="{task.timelimit_per_data}" step="0.1" class="bg-dark text-white"></td>'
+        html_table += f'<td><input type="submit" value="変更" class="btn btn-outline-info"></td>'
+        html_table += f"</tr>"
+        html_table += f'</form>'
+
+    html_table += "</tbody>"
+    html_table += "</table>"
+
+    return html_table
+
+
 def VerifyEmailAndPassword(email, password):
     # ユーザ情報を読み込む
     users = ReadUsersCsv(USER_CSV_PATH)
@@ -687,7 +726,7 @@ def index():
             if admin:
                 task_list_prepare.append(info)
     
-    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"], menu=menuHTML(Page.HOME, url_from="/"))
+    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"], menu=menuHTML(Page.HOME, url_from="/"), admin=admin)
 
 
 @app.route('/favicon.ico')
@@ -1115,17 +1154,46 @@ def admin(task_id):
                            inproc_text=Markup(CreateInProcHtml(task_id)),
                            num_col=num_col)
 
-@app.route('/admin')
+@app.route('/admin', methods=['GET', 'POST'])
 def manage():
     # ユーザ認証
     verified, user_data, admin = VerifyByCookie(request)
     if not admin:
         return redirect(url_for('index'))
+    
+    # タスク一覧の再読み込み
+    global TASK
+    TASK = Task.readTasks()
 
-    user_table = CreateUserTable()
-    log_table = Log.createTable()
+    # タスク情報の変更
+    if request.method == 'POST':
+        try:
+            target_task_id = request.form["task-id"]
+            if not target_task_id in TASK:
+                raise(ValueError())
+            
+            # タスク情報の書き換え
+            if target_task_id is not None:
+                task:Task = TASK[target_task_id]
+                task.start_date = datetime.datetime.strptime(request.form["start-date"], '%Y-%m-%d')
+                task.end_date = datetime.datetime.strptime(request.form["end-date"], '%Y-%m-%d')
+                task.goal = float(request.form["goal"])
+                task.timelimit_per_data = float(request.form["timelimit-per-data"])
+                
+            # ファイル出力
+            success = task.save()
+            Log.write(f"{Task.FILENAME_TASK_JSON} of {target_task_id} {'was uplooaded.' if success else 'cannot be uploaded.'}")
 
-    return render_template('admin.html', user_table=Markup(user_table), log_table=Markup(log_table))
+            # タスク一覧の再読み込み
+            TASK = Task.readTasks()
+
+        except:
+            print("Task情報の書き換えに失敗")
+   
+    return render_template('admin.html',
+                           user_table=Markup(CreateUserTable()),
+                           task_table=Markup(CreateTaskTable(TASK)),
+                           log_table=Markup(Log.createTable()))
 
 
 if __name__ == "__main__":
@@ -1136,20 +1204,8 @@ if __name__ == "__main__":
         print(f"settingファイルを開けません: {SETTING_JSON_PATH}")
         exit()
 
-    # タスク一覧を作成
-    dir_list = glob.glob(Task.TASKS_DIR + '/**/')
-    for dir in dir_list:
-        # ディレクトリ名を取得→タスクIDとして使う
-        task_id = os.path.basename(os.path.dirname(dir))
-
-        try:
-            # タスク情報を取得
-            task:Task = Task(task_id)
-            print(f"found task: ({task_id}) {task.name}")
-            TASK[task_id] = task
-        except:
-            continue
-
+    # タスク一覧
+    TASK = Task.readTasks()
 
     # アプリ開始
     app.run(debug=False, host='0.0.0.0', port=5000)
