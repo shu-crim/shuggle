@@ -54,7 +54,7 @@
 
         {% if task_list_closed|length > 0 %}
         <div class="container col-11">
-            <h2>{{name_contest}}開催期間終了後の<span style="color:#00a497">T</span>ask (提出・評価は可)</h2>
+            <h2>{{name_contest}}開催期間終了後の<span style="color:#00a497">T</span>ask (目標達成で<span style="color:#0dcaf0">★</span>獲得)</h2>
         </div>
 
         <div class="container col-11">
@@ -82,7 +82,7 @@
 
         {% if task_list_quest|length > 0 %}
         <div class="container col-11">
-            <h2>Quest <span style="color:#00a497">T</span>ask</h2>
+            <h2>Quest <span style="color:#00a497">T</span>ask (目標達成で<span style="color:#0dcaf0">☆</span>獲得)</h2>
         </div>
 
         <div class="container col-11">
@@ -110,7 +110,7 @@
 
         {% if task_list_prepare|length > 0 %}
         <div class="container col-11">
-            <h2>準備中の<span style="color:#00a497">T</span>ask</h2>
+            <h2>開催期間前の<span style="color:#00a497">T</span>ask</h2>
         </div>
 
         <div class="container col-11">
@@ -132,6 +132,14 @@
                 {% endfor %}
             </div>
         </div>
+        {% endif %}
+
+        {% if admin %}
+        <div class="container col-11">
+            <h2>管理者<span style="color:#00a497">区</span>域</h2>
+            <a href="/admin" class="btn btn-outline-info">管理者区域</a>
+        </div>
+        <br><br>
         {% endif %}
 
         <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>

@@ -6,11 +6,13 @@ import json
 from functools import cmp_to_key
 from flask import Markup
 import glob
+import shutil
 
 
 class Task:
     TASKS_DIR =r"./tasks"
     FILENAME_TASK_JSON = r"task.json"
+    BACKUP_DIR_NAME = r"backup"
 
     class AnswerValueType(Enum):
         real = 1
@@ -77,6 +79,26 @@ class Task:
             print(f"Taskを読み込めませんでした: {task_id}")
 
     @staticmethod
+    def readTasks():
+        tasks = {}
+
+        # タスク一覧を作成
+        dir_list = glob.glob(Task.TASKS_DIR + '/**/')
+        for dir in dir_list:
+            # ディレクトリ名を取得→タスクIDとして使う
+            task_id = os.path.basename(os.path.dirname(dir))
+
+            try:
+                # タスク情報を取得
+                task:Task = Task(task_id)
+                print(f"found task: ({task_id}) {task.name}")
+                tasks[task_id] = task
+            except:
+                continue
+
+        return tasks
+
+    @staticmethod
     def answerValueType(answer_value_type):
         if answer_value_type == "integer":
             return Task.AnswerValueType.integer
@@ -110,6 +132,47 @@ class Task:
         elif metric == Task.Metric.MAE:
             goal_text = f'平均絶対誤差 <span style="color:#0dcaf0">{goal}</span> 以下'
         return Markup(goal_text)
+
+    def dispname(self, name_contest:str) -> str:
+        task_name = f'{self.name} - '
+        if self.type == Task.TaskType.Contest:
+            task_name += name_contest
+            task_name += "開催中" if datetime.datetime.now() >= self.start_date and datetime.datetime.now() < self.end_date else ""
+        elif self.type == Task.TaskType.Quest:
+            task_name += "Quest"
+
+        return task_name
+    
+    def save(self) -> bool:
+        try:
+            json_path = os.path.join(Task.TASKS_DIR, self.id, Task.FILENAME_TASK_JSON)
+
+            # バックアップ
+            if not os.path.exists(os.path.join(Task.TASKS_DIR, self.id)):
+                raise(ValueError(f"Task{self.id}のディレクトリが存在しません。"))
+            backup_dir = os.path.join(Task.TASKS_DIR, self.id, Task.BACKUP_DIR_NAME)
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            shutil.copy2(json_path, os.path.join(backup_dir, datetime.datetime.now().strftime('%Y%m%d_%H%M%S_') + Task.FILENAME_TASK_JSON))
+
+            # 現在の設定を読み込む
+            json_open = open(json_path, 'r', encoding='utf-8')
+            task = json.load(json_open)
+
+            # 設定を書き換える(書き換え可能なものだけ)
+            task["info"]["start_date"] = self.start_date.strftime("%Y-%m-%d")
+            task["info"]["end_date"] = self.end_date.strftime("%Y-%m-%d")
+            task["info"]["goal"] = self.goal
+            task["info"]["timelimit_per_data"] = self.timelimit_per_data
+
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(task, f, indent=4, ensure_ascii=False)
+                
+        except Exception as e:
+            print(e)
+            return False
+        
+        return True
 
 
 class Stats:
