@@ -264,7 +264,7 @@ def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visi
     html_user = ""
     html_user += f'<tr>'
     html_user += f'<td>{stats.username}</td>'
-    if unlock:
+    if unlock and AchieveGoal(task, stats):
         html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
     else:
         html_user += f'<td>{stats.datetime}</td>'
@@ -972,7 +972,7 @@ def board(task_id):
 
     # 日付順にソート
     sorted_stats_list = sorted(best_stats_every_user, key=lambda x: x.datetime, reverse=True)
-
+ 
     # unlock判定
     unlock = False
     if verified and my_stats is not None:
