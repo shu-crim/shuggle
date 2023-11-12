@@ -111,6 +111,16 @@ class Task:
             goal_text = f'平均絶対誤差 <span style="color:#0dcaf0">{goal}</span> 以下'
         return Markup(goal_text)
 
+    def dispname(self, name_contest:str) -> str:
+        task_name = f'{self.name} - '
+        if self.type == Task.TaskType.Contest:
+            task_name += name_contest
+            task_name += "開催中" if datetime.datetime.now() >= self.start_date and datetime.datetime.now() < self.end_date else ""
+        elif self.type == Task.TaskType.Quest:
+            task_name += "Quest"
+
+        return task_name
+
 
 class Stats:
     username : str

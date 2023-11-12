@@ -3,7 +3,7 @@
         "id": "task-y",
         "name": "Task Y",
         "explanation": "Task Yの説明です。どのようなデータで、どのような処理を期待するのか、説明します。",
-        "start_date": "2023-12-30",
+        "start_date": "2023-10-30",
         "end_date": "2024-1-25",
         "answer_value_type": "integer",
         "metric": "Accuracy",

@@ -248,13 +248,13 @@ def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
     return ' style="color:#0dcaf0"' if achieve else ''
 
 
-def Achieve(metric:Task.Metric, goal, train, valid, test=None):
-    result = '<span style="color:#0dcaf0">★</span>'
-    if metric == Task.Metric.Accuracy:
-        if train < goal or valid < goal or (test is not None and test < goal):
+def Achieve(task:Task, stats:Stats):
+    result = f'<span style="color:#0dcaf0">{"★" if task.type == Task.TaskType.Contest else "☆"}</span>'
+    if task.metric == Task.Metric.Accuracy:
+        if stats.train < task.goal or stats.valid < task.goal or (task.type == Task.TaskType.Contest and stats.test < task.goal):
             result = ''
-    elif metric == Task.Metric.MAE:
-        if train > goal or valid > goal or (test is not None and test > goal):
+    elif task.metric == Task.Metric.MAE:
+        if stats.train > task.goal or stats.valid > task.goal or (task.type == Task.TaskType.Contest and stats.test > task.goal):
             result = ''
 
     return result
@@ -431,7 +431,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
         html_temp = ""
         if submit.task.metric == Task.Metric.Accuracy:
             if goal:
-                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task.metric, submit.task.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task.type == Task.TaskType.Contest else None)}</td>'
+                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task, submit.stats)}</td>'
             if submit.stats.train < 0:
                 if visible_invalid_data:
                     html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
@@ -455,7 +455,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
 
         elif submit.task.metric == Task.Metric.MAE:
             if goal:
-                html_temp += f'<td>MAE <span style="color:#0dcaf0">{submit.task.goal:.1f}</span> 以下 {Achieve(submit.task.metric, submit.task.goal, submit.stats.train, submit.stats.valid, submit.stats.test if submit.task.type == Task.TaskType.Contest else None)}</td>'
+                html_temp += f'<td>MAE <span style="color:#0dcaf0">{submit.task.goal:.1f}</span> 以下 {Achieve(submit.task, submit.stats)}</td>'
             try:
                 if submit.stats.train < 0:
                     if visible_invalid_data:
@@ -674,7 +674,7 @@ def index():
         if value.start_date <= today:
             # スタート後
             if task.type == Task.TaskType.Quest:
-                # Questはいつでも開かれている
+                # Questはいつまでも開かれている
                 task_list_quest.append(info)
             elif task.type == Task.TaskType.Contest:
                 # Contestは開催期間により振り分け
@@ -940,10 +940,10 @@ def task(task_id):
     # タスク情報を読み込む
     task:Task = Task(task_id)
 
-    # Goal表記
-    goal_text = Task.GoalText(task.metric, task.goal)
-
-    return render_template(f'tasks/{task_id}/index.html', menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin), task_name=TASK[task_id].name, goal=goal_text)
+    return render_template(f'tasks/{task_id}/index.html',
+                           menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin),
+                           task_name=task.dispname(SETTING["name"]["contest"]),
+                           goal=Task.GoalText(task.metric, task.goal))
 
 
 @app.route("/<task_id>/board", methods=['GET'])
@@ -987,13 +987,14 @@ def board(task_id):
     # 表を作成
     html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
 
-    # 評価中の表示
-    inproc_text = CreateInProcHtml(task_id)
-
-    # Goal表記
-    goal_text = Task.GoalText(task.metric, task.goal)
-
-    return render_template('board.html', task_name=TASK[task_id].name, table_board=Markup(html_table), menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
+    return render_template('board.html',
+                           task_name=task.dispname(SETTING["name"]["contest"]),
+                           table_board=Markup(html_table),
+                           menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin),
+                           inproc_text=Markup(CreateInProcHtml(task_id)),
+                           goal=Task.GoalText(task.metric, task.goal),
+                           num_col=num_col, task_id=task_id
+                           )
 
 
 @app.route("/<task_id>/log")
@@ -1020,13 +1021,13 @@ def log(task_id):
     # 表を作成
     html_table, num_col = CreateBoardTable(sorted_stats_list, task)
 
-    # 評価中の表示
-    inproc_text = CreateInProcHtml(task_id)
-
-    # Goal表記
-    goal_text = Task.GoalText(task.metric, task.goal)
-
-    return render_template('log.html', task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col, task_id=task_id, goal=goal_text)
+    return render_template('log.html',
+                           task_name=task.dispname(SETTING["name"]["contest"]),
+                           table_log=Markup(html_table),
+                           menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin), 
+                           inproc_text=Markup(CreateInProcHtml(task_id)), 
+                           num_col=num_col, task_id=task_id,
+                           goal=Task.GoalText(task.metric, task.goal))
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
@@ -1106,11 +1107,13 @@ def admin(task_id):
     # 表を作成
     html_table, num_col = CreateBoardTable(sorted_stats_list, task, test=True, message=True, unlock=True)
 
-    # 評価中の表示
-    inproc_text = CreateInProcHtml(task_id)
-
-    return render_template('log.html', task_id=task_id, task_name=TASK[task_id].name, table_log=Markup(html_table), menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin), inproc_text=Markup(inproc_text), num_col=num_col)
-
+    return render_template('log.html',
+                           task_id=task_id,
+                           task_name=task.dispname(SETTING["name"]["contest"]),
+                           table_log=Markup(html_table),
+                           menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin),
+                           inproc_text=Markup(CreateInProcHtml(task_id)),
+                           num_col=num_col)
 
 @app.route('/admin')
 def manage():
