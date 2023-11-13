@@ -1081,6 +1081,9 @@ def upload_file(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
     
+    if TASK[task_id].suspend:
+        return redirect(url_for('index'))
+    
     def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
