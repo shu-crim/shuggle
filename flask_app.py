@@ -1081,7 +1081,9 @@ def upload_file(task_id):
     if not task_id in TASK:
         return redirect(url_for('index'))
     
-    if TASK[task_id].suspend:
+    task:Task = TASK[task_id]
+    
+    if task.suspend:
         return redirect(url_for('index'))
     
     def allowed_file(filename):
@@ -1127,7 +1129,7 @@ def upload_file(task_id):
     # ユーザ認証
     verified, user_data, admin = VerifyByCookie(request)
 
-    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin), url_from=f"/{task_id}/upload")
+    return render_template('upload.html', task_id=task_id, task_name=task.name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin), url_from=f"/{task_id}/upload", time_limit=task.timelimit_per_data)
   
 
 @app.route('/<task_id>/admin')
