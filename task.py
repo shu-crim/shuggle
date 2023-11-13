@@ -48,6 +48,7 @@ class Task:
     type: TaskType = TaskType.Quest
     goal = 0
     timelimit_per_data: float = 1.0
+    suspend: bool = False
 
     def __init__(self, task_id) -> None:
         try:
@@ -74,6 +75,8 @@ class Task:
                 self.goal = float(task["goal"])
             if "timelimit_per_data" in task:
                 self.timelimit_per_data = float(task["timelimit_per_data"])
+            if "suspend" in task:
+                self.suspend = task["suspend"]
         except Exception as e:
             print(e)
             print(f"Taskを読み込めませんでした: {task_id}")
@@ -164,10 +167,11 @@ class Task:
             task["info"]["end_date"] = self.end_date.strftime("%Y-%m-%d")
             task["info"]["goal"] = self.goal
             task["info"]["timelimit_per_data"] = self.timelimit_per_data
+            task["info"]["suspend"] = self.suspend
 
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(task, f, indent=4, ensure_ascii=False)
-                
+
         except Exception as e:
             print(e)
             return False

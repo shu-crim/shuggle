@@ -596,6 +596,7 @@ def CreateTaskTable(tasks) -> str:
     html_table += "<th>Metric</th>"
     html_table += "<th>Goal</th>"
     html_table += "<th>制限時間[s/data]</th>"
+    html_table += "<th>停止</th>"
     html_table += "<th>変更</th>"
     html_table += "</tr></thead>"
     html_table += "<tbody>"
@@ -613,6 +614,7 @@ def CreateTaskTable(tasks) -> str:
         html_table += f"<td>{task.metric.name}</td>"
         html_table += f'<td><input type="number" name="goal" value="{task.goal}" step="0.1" class="bg-dark text-white"></td>'
         html_table += f'<td><input type="number" name="timelimit-per-data" value="{task.timelimit_per_data}" step="0.1" class="bg-dark text-white"></td>'
+        html_table += f'<td>&nbsp;&nbsp;&nbsp;<input type="checkbox" name="suspend" class="form-check-input"{" checked" if task.suspend else ""}>&nbsp;&nbsp;&nbsp;</td>'
         html_table += f'<td><input type="submit" value="変更" class="btn btn-outline-info"></td>'
         html_table += f"</tr>"
         html_table += f'</form>'
@@ -706,6 +708,9 @@ def index():
     task_list_prepare = []
     for key, value in TASK.items():
         task:Task = value
+        if task.suspend:
+            continue
+
         info = {
             'id': key,
             'name': task.name,
@@ -1181,6 +1186,7 @@ def manage():
                 task.end_date = datetime.datetime.strptime(request.form["end-date"], '%Y-%m-%d')
                 task.goal = float(request.form["goal"])
                 task.timelimit_per_data = float(request.form["timelimit-per-data"])
+                task.suspend = True if "suspend" in request.form else False
                 
             # ファイル出力
             success = task.save()
