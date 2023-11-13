@@ -153,7 +153,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         for i in range(num_train):
             result = Result(Task.DataType.train, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
-        print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, totla: {total_proc_time : .1f} s')
+        print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, total: {total_proc_time : .1f} s')
 
         # valid
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
@@ -165,7 +165,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         for i in range(num_valid):
             result = Result(Task.DataType.valid, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
-        print(f'Valid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, totla: {total_proc_time : .1f} s')
+        print(f'Valid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, total: {total_proc_time : .1f} s')
 
         # test
         if contest:
@@ -178,7 +178,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
             for i in range(num_test):
                 result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i])
                 result_list.append(result)
-            print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, totla: {total_proc_time : .1f} s')
+            print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, total: {total_proc_time : .1f} s')
 
     except Exception as e:
         raise(e)
