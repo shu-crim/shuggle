@@ -249,6 +249,10 @@ def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
 
 
 def Achieve(task:Task, stats:Stats):
+    # コンテスト中の場合は非表示
+    if task.type == Task.TaskType.Contest and datetime.datetime.now() < task.end_date:
+        return ''
+
     result = f'<span style="color:#0dcaf0">{"★" if task.type == Task.TaskType.Contest else "☆"}</span>'
     if task.metric == Task.Metric.Accuracy:
         if stats.train < task.goal or stats.valid < task.goal or (task.type == Task.TaskType.Contest and stats.test < task.goal):
@@ -263,7 +267,7 @@ def Achieve(task:Task, stats:Stats):
 def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
     html_user = ""
     html_user += f'<tr>'
-    html_user += f'<td>{stats.username}</td>'
+    html_user += f'<td>{stats.username} {Achieve(task, stats)}</td>'
     if unlock and AchieveGoal(task, stats):
         html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
     else:
