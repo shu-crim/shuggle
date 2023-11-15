@@ -389,7 +389,7 @@ def CreateMyTaskTable(user_id) -> str:
             stats = user_stats[user_id]
 
             # 表示最優先の成績を選択
-            best_stats = Stats.GetBestStats(stats)
+            best_stats = Stats.GetBestStats(stats, task)
             if best_stats is not None:
                 submit:Submit = Submit()
                 submit.stats = best_stats
@@ -1014,7 +1014,7 @@ def board(task_id):
     best_stats_every_user = []
     my_stats = None
     for user_name, stats in user_stats.items():
-        best_stats:Stats = Stats.GetBestStats(stats)
+        best_stats:Stats = Stats.GetBestStats(stats, task)
         if best_stats is not None:
             best_stats_every_user.append(best_stats)
             if verified and best_stats.userid == user_data.id:
@@ -1062,21 +1062,30 @@ def log(task_id):
     user_stats = GetUserStats(task_id)
 
     # 辞書をリスト化してソート
+    unlock = False
     stats_list = []
     for stats in user_stats.values():
         for item in stats:
             stats_list.append(item)
+            if verified and item.userid == user_data.id and AchieveGoal(task, item):
+                # Questであればいつでも、Contestであれば期間終了後にロック解除
+                if task.type == Task.TaskType.Quest:
+                    unlock = True
+                elif task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date: 
+                    unlock = True
+
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
 
     return render_template('log.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_log=Markup(html_table),
                            menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin), 
                            inproc_text=Markup(CreateInProcHtml(task_id)), 
-                           num_col=num_col, task_id=task_id,
+                           num_col=num_col,
+                           task_id=task_id,
                            goal=Task.GoalText(task.metric, task.goal))
 
 
