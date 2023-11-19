@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>IR Tasks | User</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+
+        <script>
+            $(document).ready(function() {
+            });
+        </script>
+    
+    </head>
+    <body>
+        <div class="container col-11">
+            <h1><a class="navbar-brand" href="/">IR <span style="color:#00a497">T</span>asks</a></h1>
+        </div>
+
+        <br>
+
+        <div class="container col-11">
+            <div class="row">
+                <h2>管理者<span style="color:#00a497">区</span>域</h2>
+            </div>
+        </div>
+
+        <div class="container col-11">
+            <h2>User List</h2>
+        </div>
+        <div class="container col-11" id="task-table">
+            {{user_table}}
+        </div>
+
+        <div class="container col-11">
+            <h2>Task List</h2>
+        </div>
+        <div class="container col-11" id="task-table">
+            {{task_table}}
+        </div>
+
+        <div class="container col-11">
+            <h2>Log</h2>
+        </div>
+        <div class="container col-11" id="log-table">
+            {{log_table}}
+        </div>
+
+        <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
+    </body>
+</html>

@@ -249,6 +249,10 @@ def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
 
 
 def Achieve(task:Task, stats:Stats):
+    # コンテスト中の場合は非表示
+    if task.type == Task.TaskType.Contest and datetime.datetime.now() < task.end_date:
+        return ''
+
     result = f'<span style="color:#0dcaf0">{"★" if task.type == Task.TaskType.Contest else "☆"}</span>'
     if task.metric == Task.Metric.Accuracy:
         if stats.train < task.goal or stats.valid < task.goal or (task.type == Task.TaskType.Contest and stats.test < task.goal):
@@ -263,7 +267,7 @@ def Achieve(task:Task, stats:Stats):
 def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
     html_user = ""
     html_user += f'<tr>'
-    html_user += f'<td>{stats.username}</td>'
+    html_user += f'<td>{stats.username} {Achieve(task, stats)}</td>'
     if unlock and AchieveGoal(task, stats):
         html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
     else:
@@ -385,7 +389,7 @@ def CreateMyTaskTable(user_id) -> str:
             stats = user_stats[user_id]
 
             # 表示最優先の成績を選択
-            best_stats = Stats.GetBestStats(stats)
+            best_stats = Stats.GetBestStats(stats, task)
             if best_stats is not None:
                 submit:Submit = Submit()
                 submit.stats = best_stats
@@ -596,6 +600,7 @@ def CreateTaskTable(tasks) -> str:
     html_table += "<th>Metric</th>"
     html_table += "<th>Goal</th>"
     html_table += "<th>制限時間[s/data]</th>"
+    html_table += "<th>停止</th>"
     html_table += "<th>変更</th>"
     html_table += "</tr></thead>"
     html_table += "<tbody>"
@@ -613,6 +618,7 @@ def CreateTaskTable(tasks) -> str:
         html_table += f"<td>{task.metric.name}</td>"
         html_table += f'<td><input type="number" name="goal" value="{task.goal}" step="0.1" class="bg-dark text-white"></td>'
         html_table += f'<td><input type="number" name="timelimit-per-data" value="{task.timelimit_per_data}" step="0.1" class="bg-dark text-white"></td>'
+        html_table += f'<td>&nbsp;&nbsp;&nbsp;<input type="checkbox" name="suspend" class="form-check-input"{" checked" if task.suspend else ""}>&nbsp;&nbsp;&nbsp;</td>'
         html_table += f'<td><input type="submit" value="変更" class="btn btn-outline-info"></td>'
         html_table += f"</tr>"
         html_table += f'</form>'
@@ -657,6 +663,10 @@ def VerifyIdAndKey(user_id, user_key):
 
 
 def VerifyByCookie(request):
+    verified = False
+    user_data = None
+    admin = False
+
     try:
         user_info = request.cookies.get(COOKIE_KEY)
         if user_info is not None:
@@ -668,9 +678,7 @@ def VerifyByCookie(request):
                 raise(ValueError())
             admin = True if SETTING["admin"]["email"] == user_data.email else False                
     except:
-        verified = False
-        user_data = None
-        admin = False
+        print("cookieによる認証に失敗しました。")
 
     return verified, user_data, admin
 
@@ -704,6 +712,9 @@ def index():
     task_list_prepare = []
     for key, value in TASK.items():
         task:Task = value
+        if task.suspend:
+            continue
+
         info = {
             'id': key,
             'name': task.name,
@@ -766,6 +777,7 @@ def join():
                 duplicate = True
                 break
         if duplicate:
+            Log.write(f"Failed to create account. the email already exist. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="そのEmail addressは既に登録されています。")
         
         # ID発行
@@ -779,6 +791,7 @@ def join():
                 break
 
         if user_id == "":
+            Log.write(f"Failed to create ID. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="IDを発行できませんでした。")
         
         # パスワードをハッシュ化
@@ -792,7 +805,10 @@ def join():
         success = AddUsersCsv(USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
 
         if not success:
+            Log.write(f"Failed to create account. AddUsersCsv() error. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="ユーザ情報を登録できませんでした。")
+
+        Log.write(f"Success to create account. email: {email}")
 
         return render_template(f'user.html', from_url=from_url, user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
 
@@ -817,7 +833,10 @@ def login():
         # emailとパスワードで照合
         verified, user_data = VerifyEmailAndPassword(email, password)
         if not verified:
+            Log.write(f"Failed to log in. email: {email}")
             return render_template(f'login.html', from_url=from_url, message="Email addressかPasswordが誤っています。", email_admin=SETTING["admin"]["email"])
+
+        Log.write(f"Success to log in. email: {email}")
 
         # 認証OKなので本人確認用のキーを作成して渡す
         user_key = str(uuid.uuid4()).split('-')[0]
@@ -834,6 +853,24 @@ def login():
         response.set_cookie(COOKIE_KEY, value=json.dumps(user_info), expires=expires)
 
         return response
+
+
+@app.route('/logout')
+def logout():
+    # ユーザ認証(認証できなくてもログアウト処理は実施)
+    verified, user_data, admin = VerifyByCookie(request)
+
+    # ユーザ情報をクッキーに書き込み
+    response = make_response(
+        render_template(f'logout.html')
+    )
+    user_info = {'id':'', 'key':''}
+    expires = int(datetime.datetime.now().timestamp()) + COOKIE_AGE_SEC
+    response.set_cookie(COOKIE_KEY, value=json.dumps(user_info), expires=expires)
+
+    Log.write(f"Success to log out. email: {user_data.email if verified else 'not verified'}")
+
+    return response
 
 
 @app.route('/user/info', methods=['GET', 'POST'])
@@ -863,6 +900,7 @@ def user():
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
                 message = 'ユーザ名を変更しました。'
+                Log.write(f"Success to change user name. user_id: {user_id}")
             elif 'buttonChangePassword' in request.form:
                 # パスワードを変更
                 password = request.form['inputPassword']
@@ -880,6 +918,7 @@ def user():
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
                 message = 'パスワードを変更しました。'
+                Log.write(f"Success to change password. user_id: {user_id}")
         except:
             return render_template(f'user.html', message=message)
 
@@ -1003,7 +1042,7 @@ def board(task_id):
     best_stats_every_user = []
     my_stats = None
     for user_name, stats in user_stats.items():
-        best_stats:Stats = Stats.GetBestStats(stats)
+        best_stats:Stats = Stats.GetBestStats(stats, task)
         if best_stats is not None:
             best_stats_every_user.append(best_stats)
             if verified and best_stats.userid == user_data.id:
@@ -1051,27 +1090,41 @@ def log(task_id):
     user_stats = GetUserStats(task_id)
 
     # 辞書をリスト化してソート
+    unlock = False
     stats_list = []
     for stats in user_stats.values():
         for item in stats:
             stats_list.append(item)
+            if verified and item.userid == user_data.id and AchieveGoal(task, item):
+                # Questであればいつでも、Contestであれば期間終了後にロック解除
+                if task.type == Task.TaskType.Quest:
+                    unlock = True
+                elif task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date: 
+                    unlock = True
+
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task)
+    html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
 
     return render_template('log.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_log=Markup(html_table),
                            menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin), 
                            inproc_text=Markup(CreateInProcHtml(task_id)), 
-                           num_col=num_col, task_id=task_id,
+                           num_col=num_col,
+                           task_id=task_id,
                            goal=Task.GoalText(task.metric, task.goal))
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
 def upload_file(task_id):
     if not task_id in TASK:
+        return redirect(url_for('index'))
+    
+    task:Task = TASK[task_id]
+    
+    if task.suspend:
         return redirect(url_for('index'))
     
     def allowed_file(filename):
@@ -1117,7 +1170,7 @@ def upload_file(task_id):
     # ユーザ認証
     verified, user_data, admin = VerifyByCookie(request)
 
-    return render_template('upload.html', task_id=task_id, task_name=TASK[task_id].name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin), url_from=f"/{task_id}/upload")
+    return render_template('upload.html', task_id=task_id, task_name=task.name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin), url_from=f"/{task_id}/upload", time_limit=task.timelimit_per_data)
   
 
 @app.route('/<task_id>/admin')
@@ -1179,6 +1232,7 @@ def manage():
                 task.end_date = datetime.datetime.strptime(request.form["end-date"], '%Y-%m-%d')
                 task.goal = float(request.form["goal"])
                 task.timelimit_per_data = float(request.form["timelimit-per-data"])
+                task.suspend = True if "suspend" in request.form else False
                 
             # ファイル出力
             success = task.save()

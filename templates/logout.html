@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>IR Tasks | Login</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+
+        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+
+<script>
+            $(document).ready(function() {
+                // ログアウトする
+                localStorage.setItem('user_id', "");
+                localStorage.setItem('user_key', "");
+                localStorage.setItem('user_name', "");
+                localStorage.setItem('user_email', "");
+                window.location.href = "/";
+            });
+        </script>    
+    </head>
+    <body>
+        <div class="container col-11">
+            <h1><a class="navbar-brand" href="/">IR <span style="color:#00a497">T</span>asks</a></h1>
+        </div>
+
+        <br>
+
+        <div class="container col-8">
+            ログアウトしました。
+        </div>
+
+        <br>
+
+        <!-- Task一覧へのリンク -->
+        <div class="row">
+            <div class="container col-2">
+            </div>
+            <div class="container col-2">
+                <a href="/"><button id="btn-root" class="w-100 p-2 form-control-lg btn btn-outline-info">Task一覧へ</button></a>
+            </div>
+            <div class="container col-8">
+            </div>
+        </div>
+
+        <script src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+    </body>
+</html>

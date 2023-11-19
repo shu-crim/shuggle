@@ -48,6 +48,7 @@ class Task:
     type: TaskType = TaskType.Quest
     goal = 0
     timelimit_per_data: float = 1.0
+    suspend: bool = False
 
     def __init__(self, task_id) -> None:
         try:
@@ -74,6 +75,8 @@ class Task:
                 self.goal = float(task["goal"])
             if "timelimit_per_data" in task:
                 self.timelimit_per_data = float(task["timelimit_per_data"])
+            if "suspend" in task:
+                self.suspend = task["suspend"]
         except Exception as e:
             print(e)
             print(f"Taskを読み込めませんでした: {task_id}")
@@ -164,10 +167,11 @@ class Task:
             task["info"]["end_date"] = self.end_date.strftime("%Y-%m-%d")
             task["info"]["goal"] = self.goal
             task["info"]["timelimit_per_data"] = self.timelimit_per_data
+            task["info"]["suspend"] = self.suspend
 
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(task, f, indent=4, ensure_ascii=False)
-                
+
         except Exception as e:
             print(e)
             return False
@@ -261,7 +265,7 @@ class Stats:
 
 
     @staticmethod
-    def GetBestStats(stats:list):
+    def GetBestStats(stats:list, task:Task):
         def compare(a:Stats, b:Stats):
             goal = a.goal
             train_a = a.train
@@ -336,6 +340,59 @@ class Stats:
                 return -1 #b
             
             return 0 # 引き分け
+        
+        def compare_without_test(a:Stats, b:Stats):
+            goal = a.goal
+            train_a = a.train
+            train_b = b.train
+            valid_a = a.valid
+            valid_b = b.valid
+
+            if a.metric == Task.Metric.MAE:
+                # 高い方がよい値となるよう反転させる
+                goal *= -1
+                train_a *= -1
+                train_b *= -1
+                valid_a *= -1
+                valid_b *= -1
+            
+            # Goal達成チェック
+            train_a_achieve = True if train_a >= goal else False
+            train_b_achieve = True if train_b >= goal else False
+            valid_a_achieve = True if valid_a >= goal else False
+            valid_b_achieve = True if valid_b >= goal else False
+
+            # test>valid>trainの順で目標達成していること
+            if valid_a_achieve and not valid_b_achieve:
+                return 1 #a
+            if not valid_a_achieve and valid_b_achieve:
+                return -1 #b
+            
+            if train_a_achieve and not train_b_achieve:
+                return 1 #a
+            if not train_a_achieve and train_b_achieve:
+                return -1 #b
+            
+            # test>valid>trainの順で性能が高い方を優先
+            if valid_a > valid_b:
+                return 1 #a
+            if valid_a < valid_b:
+                return -1 #b
+            
+            if train_a > train_b:
+                return 1 #a
+            if train_a < train_b:
+                return -1 #b
+            
+            # 提出日時が新しい方を優先
+            if a.datetime > b.datetime:
+                return 1 #a
+            if a.datetime < b.datetime:
+                return -1 #b
+            
+            return 0 # 引き分け
+
+        in_contest = True if task.type == Task.TaskType.Contest and datetime.datetime.now() < task.end_date else False
 
         target_stats = []
         for item in stats:
@@ -347,7 +404,10 @@ class Stats:
             return None
 
         try:
-            sorted_list = sorted(target_stats, key=cmp_to_key(compare))
+            if in_contest:
+                sorted_list = sorted(target_stats, key=cmp_to_key(compare_without_test))
+            else:
+                sorted_list = sorted(target_stats, key=cmp_to_key(compare))
             best_stats = sorted_list[-1]
         except:
             return None
