@@ -777,6 +777,7 @@ def join():
                 duplicate = True
                 break
         if duplicate:
+            Log.write(f"Failed to create account. the email already exist. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="そのEmail addressは既に登録されています。")
         
         # ID発行
@@ -790,6 +791,7 @@ def join():
                 break
 
         if user_id == "":
+            Log.write(f"Failed to create ID. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="IDを発行できませんでした。")
         
         # パスワードをハッシュ化
@@ -803,7 +805,10 @@ def join():
         success = AddUsersCsv(USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
 
         if not success:
+            Log.write(f"Failed to create account. AddUsersCsv() error. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="ユーザ情報を登録できませんでした。")
+
+        Log.write(f"Success to create account. email: {email}")
 
         return render_template(f'user.html', from_url=from_url, user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
 
@@ -828,7 +833,10 @@ def login():
         # emailとパスワードで照合
         verified, user_data = VerifyEmailAndPassword(email, password)
         if not verified:
+            Log.write(f"Failed to log in. email: {email}")
             return render_template(f'login.html', from_url=from_url, message="Email addressかPasswordが誤っています。", email_admin=SETTING["admin"]["email"])
+
+        Log.write(f"Success to log in. email: {email}")
 
         # 認証OKなので本人確認用のキーを作成して渡す
         user_key = str(uuid.uuid4()).split('-')[0]
@@ -845,6 +853,24 @@ def login():
         response.set_cookie(COOKIE_KEY, value=json.dumps(user_info), expires=expires)
 
         return response
+
+
+@app.route('/logout')
+def logout():
+    # ユーザ認証(認証できなくてもログアウト処理は実施)
+    verified, user_data, admin = VerifyByCookie(request)
+
+    # ユーザ情報をクッキーに書き込み
+    response = make_response(
+        render_template(f'logout.html')
+    )
+    user_info = {'id':'', 'key':''}
+    expires = int(datetime.datetime.now().timestamp()) + COOKIE_AGE_SEC
+    response.set_cookie(COOKIE_KEY, value=json.dumps(user_info), expires=expires)
+
+    Log.write(f"Success to log out. email: {user_data.email if verified else 'not verified'}")
+
+    return response
 
 
 @app.route('/user/info', methods=['GET', 'POST'])
@@ -874,6 +900,7 @@ def user():
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
                 message = 'ユーザ名を変更しました。'
+                Log.write(f"Success to change user name. user_id: {user_id}")
             elif 'buttonChangePassword' in request.form:
                 # パスワードを変更
                 password = request.form['inputPassword']
@@ -891,6 +918,7 @@ def user():
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
                 message = 'パスワードを変更しました。'
+                Log.write(f"Success to change password. user_id: {user_id}")
         except:
             return render_template(f'user.html', message=message)
 
