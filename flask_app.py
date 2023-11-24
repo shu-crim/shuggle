@@ -324,7 +324,7 @@ def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visi
     return html_user
 
 
-def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=False, unlock=False):
+def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=False, unlock=False, table_id='sortable-table'):
     def metricName(metric: Task.Metric):
         if metric == Task.Metric.Accuracy:
             return '正解率'
@@ -335,7 +335,7 @@ def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=Fals
 
     num_col = 0
     html_table = ""
-    html_table += "<table class=\"table table-dark\" id=\"fav-table\">"
+    html_table += f"<table class=\"table table-dark\" id=\"{table_id}\">"
     html_table += "<thead><tr>"
     html_table += f"<th id=\"th-{num_col}\">参加者</th>"
     num_col += 1
@@ -1056,6 +1056,7 @@ def board(task_id):
 
     # ユーザごとに表示最優先の成績を選択
     best_stats_every_user = []
+    best_stats_in_contest = []
     my_stats = None
     for user_name, stats in user_stats.items():
         best_stats:Stats = Stats.GetBestStats(stats, task)
@@ -1064,8 +1065,23 @@ def board(task_id):
             if verified and best_stats.userid == user_data.id:
                 my_stats = best_stats
 
+        # コンテスト期間中の各ユーザベスト
+        if task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date:
+            stats_in_contest = []
+            for item in stats:
+                one_stats:Stats = item
+                if one_stats.datetime >= task.start_date and one_stats.datetime < task.end_date:
+                    stats_in_contest.append(one_stats)
+            best_stats:Stats = Stats.GetBestStats(stats_in_contest, task)
+            if best_stats is not None:
+                best_stats_in_contest.append(best_stats)
+
     # 日付順にソート
     sorted_stats_list = sorted(best_stats_every_user, key=lambda x: x.datetime, reverse=True)
+    
+    # test成績順にソート
+    if len(best_stats_in_contest) > 0:
+        sorted_stats_list_in_contest = sorted(best_stats_in_contest, key=lambda x: x.test, reverse=True)
  
     # unlock判定
     unlock = False
@@ -1081,9 +1097,15 @@ def board(task_id):
     # 表を作成
     html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
 
+    # コンテスト終了時の成績表を作成
+    html_contest_result = None
+    if len(best_stats_in_contest) > 0:
+        html_contest_result, num_col = CreateBoardTable(sorted_stats_list_in_contest, task, unlock=unlock, test=True)
+
     return render_template('board.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_board=Markup(html_table),
+                           table_contest_result=Markup(html_contest_result) if html_contest_result is not None else None,
                            menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin),
                            inproc_text=Markup(CreateInProcHtml(task_id)),
                            goal=Task.GoalText(task.metric, task.goal),

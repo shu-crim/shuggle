@@ -57,6 +57,19 @@
             {{table_board}}
         </div>
 
+        {% if table_contest_result %}
+        <br>
+        <br>
+        <div class="container col-12">
+            <div class="row">
+                <h2>{{task_name}}開催時の<span style="color:#00a497">結</span>果</h2>
+            </div>
+        </div>
+        <div class="container col-11">
+            {{table_contest_result}}
+        </div>
+	    {% endif %}
+
         <script type="text/javascript" src="{{url_for('static', filename='js/table.js')}}"></script>
         <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
         <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
