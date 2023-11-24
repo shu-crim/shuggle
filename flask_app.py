@@ -715,10 +715,26 @@ def index():
         if task.suspend:
             continue
 
+        task_period = ''
+        if task.start_date <= today:
+            if task.type == Task.TaskType.Contest:
+                if task.end_date <= today:
+                    # 終了後
+                    task_period = f'開催期間後' 
+                else:
+                    # 開催中
+                    task_period = f'{task.start_date.strftime("%Y-%m-%d")}～{(task.end_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")}' 
+            elif task.type == Task.TaskType.Quest:
+                task_period = f'開催中' 
+        else:
+            # スタート前
+            task_period = f'開始前({task.start_date.strftime("%Y-%m-%d")}～{(task.end_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")})'
+
         info = {
             'id': key,
             'name': task.name,
-            'explanation': task.explanation
+            'explanation': task.explanation,
+            'period': task_period
         }
 
         if value.start_date <= today:
