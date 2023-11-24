@@ -160,12 +160,13 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
             os.path.join(Task.TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
-        random.seed(int(start))
-        random.shuffle(input_data_list)
-        random.seed(int(start))
-        random.shuffle(correct_list)
-        random.seed(int(start))
-        random.shuffle(filename_list)
+        # シャッフル
+        rng = np.random.default_rng(int(start))
+        rng.shuffle(input_data_list)
+        rng = np.random.default_rng(int(start))
+        rng.shuffle(correct_list)
+        rng = np.random.default_rng(int(start))
+        rng.shuffle(filename_list)
 
         answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
         if num_valid == 0:
@@ -180,12 +181,13 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
             num_test, filename_list, input_data_list, correct_list = read_dataset(
                 os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
-            random.seed(int(start))
-            random.shuffle(input_data_list)
-            random.seed(int(start))
-            random.shuffle(correct_list)
-            random.seed(int(start))
-            random.shuffle(filename_list)
+            # シャッフル
+            rng = np.random.default_rng(int(start))
+            rng.shuffle(input_data_list)
+            rng = np.random.default_rng(int(start))
+            rng.shuffle(correct_list)
+            rng = np.random.default_rng(int(start))
+            rng.shuffle(filename_list)
 
             answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
             if num_test == 0:
