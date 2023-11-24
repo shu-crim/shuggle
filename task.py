@@ -10,7 +10,7 @@ import shutil
 
 
 class Task:
-    TASKS_DIR =r"./tasks"
+    TASKS_DIR =r"tasks"
     FILENAME_TASK_JSON = r"task.json"
     BACKUP_DIR_NAME = r"backup"
 
@@ -140,7 +140,8 @@ class Task:
         task_name = f'{self.name} - '
         if self.type == Task.TaskType.Contest:
             task_name += name_contest
-            task_name += "開催中" if datetime.datetime.now() >= self.start_date and datetime.datetime.now() < self.end_date else ""
+            if datetime.datetime.now() >= self.start_date and datetime.datetime.now() < self.end_date:
+                task_name += f'開催中({self.start_date.strftime("%Y-%m-%d")}～{(self.end_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")})'
         elif self.type == Task.TaskType.Quest:
             task_name += "Quest"
 

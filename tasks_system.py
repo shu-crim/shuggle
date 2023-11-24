@@ -14,10 +14,11 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import json
 from task import Task, Log
 import chardet
+import random
 
 
-UPLOAD_DIR = r"./upload_dir"
-OUTPUT_DIR = r"./output"
+UPLOAD_DIR_NAME = r"upload"
+OUTPUT_DIR_NAME = r"output"
 USER_MODULE_DIR_NAME = r"user_module"
 TIMESTAMP_FILE_NAME = r"timestamp.txt"
 FILENAME_DATASET_JSON = r"dataset.json"
@@ -26,10 +27,10 @@ PROC_TIMEOUT_SEC = 1
 
 def UpdateTtimestamp(task_id):
     # ディレクトリが無ければ作成
-    if not os.path.exists(os.path.join(OUTPUT_DIR, task_id)):
-        os.makedirs(os.path.join(OUTPUT_DIR, task_id))
+    if not os.path.exists(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME)):
+        os.makedirs(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME))
 
-    with open(os.path.join(OUTPUT_DIR, task_id, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
+    with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
@@ -127,7 +128,7 @@ class Result:
 def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch, contest:bool=False, timelimit_per_data=PROC_TIMEOUT_SEC):
     try:
         # ユーザ作成の処理を読み込む
-        user_module = importlib.import_module(f"{USER_MODULE_DIR_NAME}.{task_id}.{module_name}")
+        user_module = importlib.import_module(f"{Task.TASKS_DIR}.{task_id}.{USER_MODULE_DIR_NAME}.{module_name}")
     except:
         raise(ValueError("モジュールを読み込めません。"))
     
@@ -159,6 +160,14 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         num_valid, filename_list, input_data_list, correct_list = read_dataset(
             os.path.join(Task.TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
+        # シャッフル
+        rng = np.random.default_rng(int(start))
+        rng.shuffle(input_data_list)
+        rng = np.random.default_rng(int(start))
+        rng.shuffle(correct_list)
+        rng = np.random.default_rng(int(start))
+        rng.shuffle(filename_list)
+
         answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
         if num_valid == 0:
             return []
@@ -172,6 +181,14 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
             num_test, filename_list, input_data_list, correct_list = read_dataset(
                 os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
+            # シャッフル
+            rng = np.random.default_rng(int(start))
+            rng.shuffle(input_data_list)
+            rng = np.random.default_rng(int(start))
+            rng.shuffle(correct_list)
+            rng = np.random.default_rng(int(start))
+            rng.shuffle(filename_list)
+
             answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
             if num_test == 0:
                 return []
@@ -239,7 +256,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
-        with open(os.path.join(OUTPUT_DIR, task_id, "detail", output_csv_filename), "w", encoding='utf-8') as output_csv_file:
+        with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "detail", output_csv_filename), "w", encoding='utf-8') as output_csv_file:
             # 集計
             output_csv_file.write(f"filename,{os.path.basename(new_filename)}\n\n")
             output_csv_file.write("type,num_data,{0}\n".format(
@@ -267,7 +284,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                     output_csv_file.write(f"{result.data_type.name},{str(result.filename).replace(',', '-')},{result.correct},{result.answer},{np.abs(result.answer - result.correct)}\n")
 
     # ユーザ毎の結果出力
-    csv_path = os.path.join(OUTPUT_DIR, task_id, "user", user_name + ".csv")
+    csv_path = os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", user_name + ".csv")
     if not os.path.exists(csv_path):
         # ファイルが無いのでヘッダを付ける
         with open(csv_path, "w", encoding='utf-8') as output_csv_file:
@@ -312,7 +329,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
     # 処理中であることを示すファイルを削除
     try:
-        os.remove(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_name}_inproc"))
+        os.remove(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", f"{user_name}_inproc"))
     except:
         print(f"{user_name}_inproc を削除できませんでした。")
 
@@ -333,13 +350,13 @@ def main():
     with ProcessPoolExecutor(max_workers=4) as proccess:
         while True:
             # ディレクトリの一覧を作成して走査
-            dir_list_tasks = glob.glob(UPLOAD_DIR + '/**/')
+            dir_list_tasks = glob.glob(os.path.join(Task.TASKS_DIR, '**/'))
             for dir_task in dir_list_tasks:                    
                 # ディレクトリ名を取得→タスクIDとして使う
                 task_id = os.path.basename(os.path.dirname(dir_task))
 
                 # ディレクトリの一覧を作成して走査
-                dir_list_users = glob.glob(dir_task + '/**/')
+                dir_list_users = glob.glob(os.path.join(dir_task, UPLOAD_DIR_NAME, '**/'))
                 for dir_user in dir_list_users:  
                     # ディレクトリ名を取得→ユーザ名として使う
                     user_name = os.path.basename(os.path.dirname(dir_user))
@@ -353,7 +370,7 @@ def main():
                     path = py_files[0] # 最初に発見したファイルのみを対象とする
 
                     # モジュール移動先が無ければ生成(新規Taskの実行時)
-                    dir_user_module = os.path.join("./", USER_MODULE_DIR_NAME, task_id)
+                    dir_user_module = os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME)
                     if not os.path.exists(dir_user_module):
                         os.makedirs(dir_user_module)
 
@@ -377,7 +394,7 @@ def main():
                             with open(path + '.txt', encoding='utf-8') as f:
                                 memo = f.read()
 
-                            shutil.move(path + '.txt', os.path.join("./", USER_MODULE_DIR_NAME, task_id, new_filename + '.txt'))
+                            shutil.move(path + '.txt', os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME, new_filename + '.txt'))
                         except Exception as e:
                             print(f"read {path + '.txt'}: {e}")
                     
@@ -386,11 +403,11 @@ def main():
                     print(f"{path} -> {new_filename}")
 
                     # 出力先ディレクトリが存在しない場合は生成(新規Taskの実行時)
-                    dir_output_user = os.path.join(OUTPUT_DIR, task_id, "user")
+                    dir_output_user = os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user")
                     if not os.path.exists(dir_output_user):
                         os.makedirs(dir_output_user)
 
-                    dir_output_detail = os.path.join(OUTPUT_DIR, task_id, "detail")
+                    dir_output_detail = os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "detail")
                     if not os.path.exists(dir_output_detail):
                         os.makedirs(dir_output_detail)
 

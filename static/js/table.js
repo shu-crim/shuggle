@@ -22,7 +22,7 @@ $(document).ready(function() {
         } 
     }
 
-    $('#fav-table').tablesorter({ 
+    $('#sortable-table').tablesorter({ 
         sortList: [[sort_index, desc]],
         sortInitialOrder: 'desc'
     });
@@ -32,7 +32,7 @@ $(document).ready(function() {
 var key_index_sorted = "index_sorted"
 var key_descending = "descending"
 $(function() { 
-    $("#fav-table")
+    $("#sortable-table")
         .tablesorter()
         .bind("sortEnd",function() {
             // 現在のソート状態を取得

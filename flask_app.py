@@ -14,8 +14,8 @@ import shutil
 from task import Task, Stats, Log
 
 
-OUTPUT_DIR = r"./output"
-UPLOAD_DIR_ROOT = r"./upload_dir"
+OUTPUT_DIR_NAME = r"output"
+UPLOAD_DIR_NAME = r"upload"
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
 SETTING = None
@@ -151,7 +151,7 @@ def GetUserStats(task_id) -> {}:
     # ユーザ情報を読み込む
     users = ReadUsersCsv(USER_CSV_PATH)
 
-    file_paths = glob.glob(os.path.join(OUTPUT_DIR, task_id, "user", "*.csv"))
+    file_paths = glob.glob(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", "*.csv"))
     stats = {}
     for file_path in file_paths:
         user_id = os.path.splitext(os.path.basename(file_path))[0]
@@ -324,7 +324,7 @@ def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visi
     return html_user
 
 
-def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=False, unlock=False):
+def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=False, unlock=False, table_id='sortable-table'):
     def metricName(metric: Task.Metric):
         if metric == Task.Metric.Accuracy:
             return '正解率'
@@ -335,7 +335,7 @@ def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=Fals
 
     num_col = 0
     html_table = ""
-    html_table += "<table class=\"table table-dark\" id=\"fav-table\">"
+    html_table += f"<table class=\"table table-dark\" id=\"{table_id}\">"
     html_table += "<thead><tr>"
     html_table += f"<th id=\"th-{num_col}\">参加者</th>"
     num_col += 1
@@ -372,7 +372,7 @@ def CreateInProcHtml(task_id):
 
     inproc_text = ''
     for user_id in users:
-        if os.path.exists(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_id}_inproc")):
+        if os.path.exists(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", f"{user_id}_inproc")):
             inproc_text += f"{users[user_id].name} さんの評価を実行中です。<br>"
 
     return inproc_text + '<br>'
@@ -715,10 +715,26 @@ def index():
         if task.suspend:
             continue
 
+        task_period = ''
+        if task.start_date <= today:
+            if task.type == Task.TaskType.Contest:
+                if task.end_date <= today:
+                    # 終了後
+                    task_period = f'開催期間後' 
+                else:
+                    # 開催中
+                    task_period = f'{task.start_date.strftime("%Y-%m-%d")}～{(task.end_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")}' 
+            elif task.type == Task.TaskType.Quest:
+                task_period = f'開催中' 
+        else:
+            # スタート前
+            task_period = f'開始前({task.start_date.strftime("%Y-%m-%d")}～{(task.end_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")})'
+
         info = {
             'id': key,
             'name': task.name,
-            'explanation': task.explanation
+            'explanation': task.explanation,
+            'period': task_period
         }
 
         if value.start_date <= today:
@@ -953,7 +969,7 @@ def submit_table(user_id, user_key):
 
 @app.route('/source/<task_id>/<filename>')
 def source(task_id, filename):
-    file_path = os.path.join(USER_MODULE_DIR_NAME, task_id, filename)
+    file_path = os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME, filename)
     if not os.path.exists(file_path):
         return render_template(f'source.html', filename='ファイルが見つかりません')
 
@@ -994,7 +1010,7 @@ def task_index(task_id):
 @app.route('/<task_id>/timestamp', methods=['GET'])
 def get_timestamp(task_id):
     try:
-        with open(os.path.join(OUTPUT_DIR, task_id, "timestamp.txt"), "r", encoding='utf-8') as f:
+        with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "timestamp.txt"), "r", encoding='utf-8') as f:
             timestamp = f.read()
     except:
         timestamp = ''
@@ -1040,6 +1056,7 @@ def board(task_id):
 
     # ユーザごとに表示最優先の成績を選択
     best_stats_every_user = []
+    best_stats_in_contest = []
     my_stats = None
     for user_name, stats in user_stats.items():
         best_stats:Stats = Stats.GetBestStats(stats, task)
@@ -1048,8 +1065,23 @@ def board(task_id):
             if verified and best_stats.userid == user_data.id:
                 my_stats = best_stats
 
+        # コンテスト期間中の各ユーザベスト
+        if task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date:
+            stats_in_contest = []
+            for item in stats:
+                one_stats:Stats = item
+                if one_stats.datetime >= task.start_date and one_stats.datetime < task.end_date:
+                    stats_in_contest.append(one_stats)
+            best_stats:Stats = Stats.GetBestStats(stats_in_contest, task)
+            if best_stats is not None:
+                best_stats_in_contest.append(best_stats)
+
     # 日付順にソート
     sorted_stats_list = sorted(best_stats_every_user, key=lambda x: x.datetime, reverse=True)
+    
+    # test成績順にソート
+    if len(best_stats_in_contest) > 0:
+        sorted_stats_list_in_contest = sorted(best_stats_in_contest, key=lambda x: x.test, reverse=True)
  
     # unlock判定
     unlock = False
@@ -1065,9 +1097,15 @@ def board(task_id):
     # 表を作成
     html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
 
+    # コンテスト終了時の成績表を作成
+    html_contest_result = None
+    if len(best_stats_in_contest) > 0:
+        html_contest_result, num_col = CreateBoardTable(sorted_stats_list_in_contest, task, unlock=unlock, test=True)
+
     return render_template('board.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_board=Markup(html_table),
+                           table_contest_result=Markup(html_contest_result) if html_contest_result is not None else None,
                            menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin),
                            inproc_text=Markup(CreateInProcHtml(task_id)),
                            goal=Task.GoalText(task.metric, task.goal),
@@ -1147,7 +1185,7 @@ def upload_file(task_id):
                 msg = "ユーザ認証に失敗しました。"
             else:
                 try:
-                    save_dir = os.path.join(UPLOAD_DIR_ROOT, task_id, user_id)
+                    save_dir = os.path.join(Task.TASKS_DIR, task_id, UPLOAD_DIR_NAME, user_id)
 
                     # まだディレクトリが存在しなければ作成(Taskのディレクトリがなければそれも生成)
                     if not os.path.exists(save_dir):
