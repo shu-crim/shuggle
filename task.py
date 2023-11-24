@@ -10,7 +10,7 @@ import shutil
 
 
 class Task:
-    TASKS_DIR =r"./tasks"
+    TASKS_DIR =r"tasks"
     FILENAME_TASK_JSON = r"task.json"
     BACKUP_DIR_NAME = r"backup"
 

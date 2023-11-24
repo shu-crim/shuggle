@@ -14,8 +14,8 @@ import shutil
 from task import Task, Stats, Log
 
 
-OUTPUT_DIR = r"./output"
-UPLOAD_DIR_ROOT = r"./upload_dir"
+OUTPUT_DIR_NAME = r"output"
+UPLOAD_DIR_NAME = r"upload"
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
 SETTING = None
@@ -151,7 +151,7 @@ def GetUserStats(task_id) -> {}:
     # ユーザ情報を読み込む
     users = ReadUsersCsv(USER_CSV_PATH)
 
-    file_paths = glob.glob(os.path.join(OUTPUT_DIR, task_id, "user", "*.csv"))
+    file_paths = glob.glob(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", "*.csv"))
     stats = {}
     for file_path in file_paths:
         user_id = os.path.splitext(os.path.basename(file_path))[0]
@@ -372,7 +372,7 @@ def CreateInProcHtml(task_id):
 
     inproc_text = ''
     for user_id in users:
-        if os.path.exists(os.path.join(OUTPUT_DIR, task_id, "user", f"{user_id}_inproc")):
+        if os.path.exists(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", f"{user_id}_inproc")):
             inproc_text += f"{users[user_id].name} さんの評価を実行中です。<br>"
 
     return inproc_text + '<br>'
@@ -953,7 +953,7 @@ def submit_table(user_id, user_key):
 
 @app.route('/source/<task_id>/<filename>')
 def source(task_id, filename):
-    file_path = os.path.join(USER_MODULE_DIR_NAME, task_id, filename)
+    file_path = os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME, filename)
     if not os.path.exists(file_path):
         return render_template(f'source.html', filename='ファイルが見つかりません')
 
@@ -994,7 +994,7 @@ def task_index(task_id):
 @app.route('/<task_id>/timestamp', methods=['GET'])
 def get_timestamp(task_id):
     try:
-        with open(os.path.join(OUTPUT_DIR, task_id, "timestamp.txt"), "r", encoding='utf-8') as f:
+        with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "timestamp.txt"), "r", encoding='utf-8') as f:
             timestamp = f.read()
     except:
         timestamp = ''
@@ -1147,7 +1147,7 @@ def upload_file(task_id):
                 msg = "ユーザ認証に失敗しました。"
             else:
                 try:
-                    save_dir = os.path.join(UPLOAD_DIR_ROOT, task_id, user_id)
+                    save_dir = os.path.join(Task.TASKS_DIR, task_id, UPLOAD_DIR_NAME, user_id)
 
                     # まだディレクトリが存在しなければ作成(Taskのディレクトリがなければそれも生成)
                     if not os.path.exists(save_dir):
