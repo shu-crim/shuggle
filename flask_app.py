@@ -11,7 +11,7 @@ import datetime
 from enum import Enum
 import shutil
 
-from task import Task, Stats, Log
+from module.task import Task, Stats, Log
 from module.user import User
 
 

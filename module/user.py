@@ -3,7 +3,7 @@ import datetime
 import glob
 import shutil
 
-from task import Task, Stats
+from module.task import Task, Stats
 
 class User:
     USER_CSV_PATH = r"./data/users.csv"

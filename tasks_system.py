@@ -12,7 +12,7 @@ from multiprocessing import Pool, TimeoutError
 import traceback
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import json
-from task import Task, Log
+from module.task import Task, Log
 import chardet
 import random
 
