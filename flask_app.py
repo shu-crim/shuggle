@@ -290,7 +290,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
                         unlock = False
                         if submit.task.achieve(submit.stats):
                             # Questであればいつでも、Contestであれば期間終了後にロック解除
-                            if datetime.datetime.now() >= submit.task.end_date: 
+                            if submit.task.afterContest(): 
                                 html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
                                 unlock = True
                         if not unlock:
@@ -315,7 +315,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
                             unlock = False
                             if submit.task.achieve(submit.stats):
                                 # Questであればいつでも、Contestであれば期間終了後にロック解除
-                                if datetime.datetime.now() >= submit.task.end_date: 
+                                if submit.task.afterContest(): 
                                     html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test:.3f}(MAE)</td>'
                                     unlock = True
                             if not unlock:
@@ -540,7 +540,7 @@ def index():
         task_period = ''
         if task.start_date <= today:
             if task.type == Task.TaskType.Contest:
-                if task.end_date <= today:
+                if task.afterContest():
                     # 終了後
                     task_period = f'開催期間後' 
                 else:
@@ -566,10 +566,10 @@ def index():
                 task_list_quest.append(info)
             elif task.type == Task.TaskType.Contest:
                 # Contestは開催期間により振り分け
-                if value.end_date > today:
-                    task_list_open.append(info)
-                else:
+                if value.afterContest():
                     task_list_closed.append(info)
+                else:
+                    task_list_open.append(info)
         else:
             # スタート前
             if admin:
@@ -713,9 +713,17 @@ def logout():
 
 @app.route('/user/info', methods=['GET', 'POST'])
 def user():
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not verified:
+        return redirect(url_for('login'))
+
     if request.method == 'GET':
         from_url = request.args.get('from')
-        return render_template(f'user.html', login="false", from_url=from_url if from_url is not None else "/")
+        return render_template(
+            f'user.html', login="false",
+            user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
+            from_url=from_url if from_url is not None else "/")
 
     elif request.method == 'POST':
         try:
@@ -758,9 +766,13 @@ def user():
                 message = 'パスワードを変更しました。'
                 Log.write(f"Success to change password. user_id: {user_id}")
         except:
-            return render_template(f'user.html', message=message)
+            return render_template(f'user.html',
+                                    user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
+                                    message=message)
 
-        return render_template(f'user.html', user_name=new_name, update_user_data="true", message=message)
+        return render_template(f'user.html',
+                                user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
+                                update_user_data="true", message=message)
 
 
 @app.route('/my-task-table/<user_id>/<user_key>')
@@ -888,7 +900,7 @@ def board(task_id):
                 my_stats = best_stats
 
         # コンテスト期間中の各ユーザベスト
-        if task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date:
+        if task.afterContest():
             stats_in_contest = []
             for item in stats:
                 one_stats:Stats = item
@@ -913,7 +925,7 @@ def board(task_id):
             # Questであればいつでも、Contestであれば期間終了後にロック解除
             if task.type == Task.TaskType.Quest:
                 unlock = True
-            elif task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date: 
+            elif task.afterContest(): 
                 unlock = True
 
     # 表を作成
@@ -959,7 +971,7 @@ def log(task_id):
                 # Questであればいつでも、Contestであれば期間終了後にロック解除
                 if task.type == Task.TaskType.Quest:
                     unlock = True
-                elif task.type == Task.TaskType.Contest and datetime.datetime.now() >= task.end_date: 
+                elif task.afterContest(): 
                     unlock = True
 
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)

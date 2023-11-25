@@ -74,8 +74,8 @@
                         var verify = document.createTextNode(decodeURI(request.responseText));
                         if (verify.data == "true") {
                             // 照合に成功したらユーザ名を表示
-                            document.getElementById('user-name').textContent = user_name;
-                            document.getElementById('user-info-name').textContent = user_name;
+                            // document.getElementById('user-name').textContent = user_name;
+                            // document.getElementById('user-info-name').textContent = user_name;
                             document.getElementById('user-info-email').textContent = user_email;
                             document.getElementById('input-user-id').value = user_id;
                             document.getElementById('input-user-key').value = user_key;
@@ -123,10 +123,6 @@
 
             function logoutClick() {
                 // ログアウトする→logoutページで処理
-                // localStorage.setItem('user_id', "");
-                // localStorage.setItem('user_key', "");
-                // localStorage.setItem('user_name', "");
-                // localStorage.setItem('user_email', "");
                 window.location.href = "/logout";
             }
 
@@ -161,7 +157,7 @@
 
         <div class="container col-11">
             <div class="row">
-                <h2>ようこそ <span id="user-name">{{user_name}}</span> <span style="color:#00a497">さ</span>ん</h2>
+                <h2>ようこそ <span id="user-name">{{user_name}}</span>{{achievement}} さん</h2>
             </div>
             {% if message != "" %}
             <div class="row">
@@ -183,6 +179,7 @@
                     <button class="w-100 p-2 btn btn-outline-light" style="pointer-events: none;">ユーザ名</button>
                 </div>
                 <div class="container col-10 d-flex align-items-center" id="user-info-name">
+                    {{user_name}}
                 </div>
             </div>
             <br>

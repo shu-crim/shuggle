@@ -141,6 +141,12 @@ class Task:
             goal_text = f'平均絶対誤差 <span style="color:#0dcaf0">{goal}</span> 以下'
         return Markup(goal_text)
 
+    def afterContest(self):
+        if self.type == Task.TaskType.Contest and datetime.datetime.now() >= self.end_date:
+            return True
+        else:
+            return False
+
     def dispname(self, name_contest:str) -> str:
         task_name = f'{self.name} - '
         if self.type == Task.TaskType.Contest:
@@ -185,12 +191,16 @@ class Task:
         return True
 
     def achieve(self, stats) -> bool:
+        # 不適正チェック
+        if stats.train < 0 or stats.valid < 0 or (self.type == Task.TaskType.Contest and stats.test < 0):
+            return False
+
         achieve = True
 
         if self.metric == Task.Metric.Accuracy:
             if stats.train < self.goal or stats.valid < self.goal or (self.type == Task.TaskType.Contest and stats.test < self.goal):
                 achieve = False
-                
+
         elif self.metric == Task.Metric.MAE:
             if stats.train > self.goal or stats.valid > self.goal or (self.type == Task.TaskType.Contest and stats.test > self.goal):
                 achieve = False

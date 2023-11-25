@@ -106,6 +106,10 @@ class User:
             task_id = os.path.basename(os.path.dirname(dir_task))
             task:Task = Task(task_id)
 
+            # コンテスト開催中はカウントしない
+            if task.type == Task.TaskType.Contest and not task.afterContest():
+                continue
+
             # ユーザの成績を読み込み
             user_stats = User.readUserStats(user_id, task_id)
 
@@ -119,6 +123,16 @@ class User:
                     break
 
         return num_achieve_contest, num_achieve_quest
+    
+
+    @staticmethod
+    def achievementStrHTML(user_id:str):
+        num_achieve_contest, num_achieve_quest = User.numAchievement(user_id)
+
+        if num_achieve_contest + num_achieve_quest == 0:
+            return ''
+
+        return f'<span style="color:#0dcaf0">★</span>{num_achieve_contest}.{num_achieve_quest}'
 
 
     @staticmethod
