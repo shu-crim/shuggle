@@ -15,13 +15,10 @@ from module.task import Task, Stats, Log
 from module.user import User
 
 
-UPLOAD_DIR_NAME = r"upload"
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
 SETTING = None
 SETTING_JSON_PATH = r"./data/setting.json"
-HASH_METHOD = "pbkdf2:sha256:260000"
-USER_MODULE_DIR_NAME = r"user_module"
 COOKIE_KEY = "user"
 COOKIE_AGE_SEC = 60 * 60 * 24 * 365
 
@@ -39,9 +36,6 @@ class Page(Enum):
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 2MB
 app.config['SECRET_KEY'] = 'secret key here'
-
-
-
 
 
 def menuHTML(page, task_id="", url_from="", admin=False):
@@ -132,10 +126,10 @@ def Achieve(task:Task, stats:Stats):
     return result
 
 
-def CreateTableRow(stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
+def CreateTableRow(stats:Stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
     html_user = ""
     html_user += f'<tr>'
-    html_user += f'<td>{stats.username} {Achieve(task, stats)}</td>'
+    html_user += f'<td>{User.userIDtoUserName(stats.userid)} {Achieve(task, stats)}</td>'
     if unlock and AchieveGoal(task, stats):
         html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
     else:
@@ -236,7 +230,7 @@ def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=Fals
 
 def CreateInProcHtml(task_id):
     # ユーザ情報を読み込む
-    users = User.ReadUsersCsv(User.USER_CSV_PATH)
+    users = User.readUsersCsv(User.USER_CSV_PATH)
 
     inproc_text = ''
     for user_id in users:
@@ -252,12 +246,12 @@ def CreateMyTaskTable(user_id) -> str:
     # user_idのstatsをTaskごとに取得
     for task_id, task in TASK.items():
         task:Task = task
-        user_stats = User.GetUserStats(task_id)
+        user_stats = User.getUserStats(task_id)
         if user_id in user_stats:
             stats = user_stats[user_id]
 
             # 表示最優先の成績を選択
-            best_stats = Stats.GetBestStats(stats, task)
+            best_stats = Stats.getBestStats(stats, task)
             if best_stats is not None:
                 submit:Submit = Submit()
                 submit.stats = best_stats
@@ -372,7 +366,7 @@ def CreateSubmitTable(user_id) -> str:
 
     # user_idのstatsをTaskごとに取得
     for task_id, task in TASK.items():
-        stats_temp = User.GetUserStats(task_id)
+        stats_temp = User.getUserStats(task_id)
         if user_id in stats_temp:
             for item in stats_temp[user_id]:
                 submit: Submit = Submit()
@@ -418,7 +412,7 @@ def CreateUserTable() -> str:
     html_table += "<tbody>"
 
     # ユーザ情報を読み込む
-    users = User.ReadUsersCsv(User.USER_CSV_PATH)
+    users = User.readUsersCsv(User.USER_CSV_PATH)
 
     for user_id, user in users.items():
         user_data:User.UserData = user
@@ -428,7 +422,7 @@ def CreateUserTable() -> str:
         latest_submit_task:Task = None
         num_submit = 0
         for task_id, task in TASK.items():
-            stats_temp = User.GetUserStats(task_id)
+            stats_temp = User.getUserStats(task_id)
             if not user_id in stats_temp:
                 continue
             num_submit += len(stats_temp[user_id])
@@ -499,7 +493,7 @@ def CreateTaskTable(tasks) -> str:
 
 def VerifyEmailAndPassword(email, password):
     # ユーザ情報を読み込む
-    users = User.ReadUsersCsv(User.USER_CSV_PATH)
+    users = User.readUsersCsv(User.USER_CSV_PATH)
     
     # 認証を行う
     verified = False
@@ -516,7 +510,7 @@ def VerifyEmailAndPassword(email, password):
 
 def VerifyIdAndKey(user_id, user_key):
     # ユーザ情報を読み込む
-    users = User.ReadUsersCsv(User.USER_CSV_PATH)
+    users = User.readUsersCsv(User.USER_CSV_PATH)
     
     # 認証を行う
     verified = False
@@ -652,7 +646,7 @@ def join():
             return render_template(f'join.html', from_url=from_url, message="再入力したパスワードが一致していません。")
         
         # ユーザ情報を読み込む
-        users = User.ReadUsersCsv(User.USER_CSV_PATH)
+        users = User.readUsersCsv(User.USER_CSV_PATH)
 
         # email重複チェック
         duplicate = False
@@ -686,10 +680,10 @@ def join():
 
         # ユーザ登録
         name = email.split('@')[0]
-        success = User.AddUsersCsv(User.USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
+        success = User.addUsersCsv(User.USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
 
         if not success:
-            Log.write(f"Failed to create account. AddUsersCsv() error. email: {email}")
+            Log.write(f"Failed to create account. addUsersCsv() error. email: {email}")
             return render_template(f'join.html', from_url=from_url, message="ユーザ情報を登録できませんでした。")
 
         Log.write(f"Success to create account. email: {email}")
@@ -726,7 +720,7 @@ def login():
         user_key = str(uuid.uuid4()).split('-')[0]
 
         # キーを保存
-        User.UpdateUsersCsv(User.USER_CSV_PATH, user_data.id, 'key', user_key)
+        User.updateUsersCsv(User.USER_CSV_PATH, user_data.id, 'key', user_key)
 
         # ユーザ情報をクッキーに書き込み
         response = make_response(
@@ -779,7 +773,7 @@ def user():
             if 'buttonChangeName' in request.form:
                 # 名前を変更
                 new_name = request.form['newName']
-                success = User.UpdateUsersCsv(User.USER_CSV_PATH, user_id, 'name', new_name)
+                success = User.updateUsersCsv(User.USER_CSV_PATH, user_id, 'name', new_name)
                 if not success:
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
@@ -797,7 +791,7 @@ def user():
                 
                 # パスワードをハッシュ化
                 pass_hash = generate_password_hash(password, salt_length=21)
-                success = User.UpdateUsersCsv(User.USER_CSV_PATH, user_id, 'pass_hash', pass_hash)
+                success = User.updateUsersCsv(User.USER_CSV_PATH, user_id, 'pass_hash', pass_hash)
                 if not success:
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
@@ -837,7 +831,7 @@ def submit_table(user_id, user_key):
 
 @app.route('/source/<task_id>/<filename>')
 def source(task_id, filename):
-    file_path = os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME, filename)
+    file_path = os.path.join(Task.TASKS_DIR, task_id, Task.USER_MODULE_DIR_NAME, filename)
     if not os.path.exists(file_path):
         return render_template(f'source.html', filename='ファイルが見つかりません')
 
@@ -878,7 +872,7 @@ def task_index(task_id):
 @app.route('/<task_id>/timestamp', methods=['GET'])
 def get_timestamp(task_id):
     try:
-        with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "timestamp.txt"), "r", encoding='utf-8') as f:
+        with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, Task.TIMESTAMP_FILE_NAME), "r", encoding='utf-8') as f:
             timestamp = f.read()
     except:
         timestamp = ''
@@ -905,7 +899,7 @@ def task(task_id):
     return render_template(f'tasks/{task_id}/index.html',
                            menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin),
                            task_name=task.dispname(SETTING["name"]["contest"]),
-                           goal=Task.GoalText(task.metric, task.goal))
+                           goal=Task.goalText(task.metric, task.goal))
 
 
 @app.route("/<task_id>/board", methods=['GET'])
@@ -920,14 +914,14 @@ def board(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = User.GetUserStats(task_id)
+    user_stats = User.getUserStats(task_id)
 
     # ユーザごとに表示最優先の成績を選択
     best_stats_every_user = []
     best_stats_in_contest = []
     my_stats = None
     for user_name, stats in user_stats.items():
-        best_stats:Stats = Stats.GetBestStats(stats, task)
+        best_stats:Stats = Stats.getBestStats(stats, task)
         if best_stats is not None:
             best_stats_every_user.append(best_stats)
             if verified and best_stats.userid == user_data.id:
@@ -940,7 +934,7 @@ def board(task_id):
                 one_stats:Stats = item
                 if one_stats.datetime >= task.start_date and one_stats.datetime < task.end_date:
                     stats_in_contest.append(one_stats)
-            best_stats:Stats = Stats.GetBestStats(stats_in_contest, task)
+            best_stats:Stats = Stats.getBestStats(stats_in_contest, task)
             if best_stats is not None:
                 best_stats_in_contest.append(best_stats)
 
@@ -976,7 +970,7 @@ def board(task_id):
                            table_contest_result=Markup(html_contest_result) if html_contest_result is not None else None,
                            menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin),
                            inproc_text=Markup(CreateInProcHtml(task_id)),
-                           goal=Task.GoalText(task.metric, task.goal),
+                           goal=Task.goalText(task.metric, task.goal),
                            num_col=num_col, task_id=task_id
                            )
 
@@ -993,7 +987,7 @@ def log(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = User.GetUserStats(task_id)
+    user_stats = User.getUserStats(task_id)
 
     # 辞書をリスト化してソート
     unlock = False
@@ -1020,7 +1014,7 @@ def log(task_id):
                            inproc_text=Markup(CreateInProcHtml(task_id)), 
                            num_col=num_col,
                            task_id=task_id,
-                           goal=Task.GoalText(task.metric, task.goal))
+                           goal=Task.goalText(task.metric, task.goal))
 
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
@@ -1053,7 +1047,7 @@ def upload_file(task_id):
                 msg = "ユーザ認証に失敗しました。"
             else:
                 try:
-                    save_dir = os.path.join(Task.TASKS_DIR, task_id, UPLOAD_DIR_NAME, user_id)
+                    save_dir = os.path.join(Task.TASKS_DIR, task_id, Task.UPLOAD_DIR_NAME, user_id)
 
                     # まだディレクトリが存在しなければ作成(Taskのディレクトリがなければそれも生成)
                     if not os.path.exists(save_dir):
@@ -1093,7 +1087,7 @@ def admin(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = User.GetUserStats(task_id)
+    user_stats = User.getUserStats(task_id)
 
     # 辞書をリスト化してソート
     stats_list = []

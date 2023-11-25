@@ -24,7 +24,7 @@ class User:
 
 
     @staticmethod
-    def WriteUsersCsv(path:str, users:dict, must_backup:bool=True) -> bool:
+    def writeUsersCsv(path:str, users:dict, must_backup:bool=True) -> bool:
         # バックアップをとる
         if os.path.exists(path):
             try:
@@ -53,9 +53,9 @@ class User:
 
 
     @staticmethod
-    def AddUsersCsv(path:str, id:str, email:str, name:str, pass_hash:str, key:str) -> bool:
+    def addUsersCsv(path:str, id:str, email:str, name:str, pass_hash:str, key:str) -> bool:
         # ユーザデータを読み込む
-        users = User.ReadUsersCsv(path)
+        users = User.readUsersCsv(path)
         if users == None:
             users = {}
 
@@ -67,12 +67,12 @@ class User:
         users[id] = User.UserData(id, email, pass_hash, name, key)
 
         # 書き込んで結果を返す
-        return User.WriteUsersCsv(path, users, True if os.path.exists(path) else False)
+        return User.writeUsersCsv(path, users, True if os.path.exists(path) else False)
 
 
     @staticmethod
-    def UpdateUsersCsv(path:str, id:str, target:str, value:str) -> bool:
-        users = User.ReadUsersCsv(path)
+    def updateUsersCsv(path:str, id:str, target:str, value:str) -> bool:
+        users = User.readUsersCsv(path)
         if users == None:
             return False
         if not id in users:
@@ -91,7 +91,7 @@ class User:
             return False
 
         # 書き込んで結果を返す
-        return User.WriteUsersCsv(path, users)
+        return User.writeUsersCsv(path, users)
 
 
     @staticmethod
@@ -109,7 +109,7 @@ class User:
 
 
     @staticmethod
-    def ReadUsersCsv(path:str):
+    def readUsersCsv(path:str):
         users = {}
         try:
             with open(path, encoding='utf-8') as f:
@@ -128,35 +128,54 @@ class User:
         return users
 
 
+    @staticmethod
+    def userIDtoUserName(user_id:str):
+        # ユーザ情報を読み込む
+        users = User.readUsersCsv(User.USER_CSV_PATH)
+
+        if not user_id in users:
+            return None
+        
+        return users[user_id].name
+
 
     @staticmethod
-    def GetUserStats(task_id) -> {}:
-        # Task情報からmetricを読み込む
+    def readUserStats(user_id:str, task_id:str) -> []:
+        csv_path = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, Task.USER_RESULT_DIR_NAME, f'{user_id}.csv')
+        if not os.path.exists(csv_path):
+            return []
+
         task = Task(task_id)
-        
-        # ユーザ情報を読み込む
-        users = User.ReadUsersCsv(User.USER_CSV_PATH)
+        stats = []
 
-        file_paths = glob.glob(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", "*.csv"))
-        stats = {}
-        for file_path in file_paths:
-            user_id = os.path.splitext(os.path.basename(file_path))[0]
-            if not user_id in users:
-                continue
-            user_name = users[user_id].name
-            stats[user_id] = []
-            
-            with open(file_path, "r", encoding='utf-8') as csv_file:
-                line = csv_file.readline() # ヘッダ読み飛ばし
-                while True:
-                    line = csv_file.readline()
-                    if not line:
-                        break
+        with open(csv_path, "r", encoding='utf-8') as csv_file:
+            line = csv_file.readline() # ヘッダ読み飛ばし
+            while True:
+                line = csv_file.readline()
+                if not line:
+                    break
 
-                    stats[user_id].append(Stats(line, user_name, task.metric, task.goal, user_id))
-
-            # ひとつもstatsがなかった場合はキーを削除
-            if len(stats[user_id]) == 0:
-                stats.pop(user_id)
+                stats.append(Stats(line, task.metric, task.goal, user_id))
 
         return stats
+    
+
+    @staticmethod
+    def getUserStats(task_id:str) -> {}:
+        user_result_dir = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user")
+        if not os.path.exists(user_result_dir):
+            return {}
+        
+        # ユーザ毎のcsvファイル一覧
+        file_paths = glob.glob(os.path.join(user_result_dir, "*.csv"))
+        
+        user_stats = {}
+        for file_path in file_paths:
+            # ユーザIDの取り出し
+            user_id = os.path.splitext(os.path.basename(file_path))[0]
+
+            stats = User.readUserStats(user_id, task_id)
+            if len(stats) > 0:
+                user_stats[user_id] = stats
+
+        return user_stats

@@ -15,6 +15,9 @@ class Task:
     BACKUP_DIR_NAME = r"backup"
     OUTPUT_DIR_NAME = r"output"
     USER_RESULT_DIR_NAME = "user"
+    UPLOAD_DIR_NAME = r"upload"
+    USER_MODULE_DIR_NAME = r"user_module"
+    TIMESTAMP_FILE_NAME = r"timestamp.txt"
 
     class AnswerValueType(Enum):
         real = 1
@@ -131,7 +134,7 @@ class Task:
             raise(ValueError("無効なinput_data_type指定です。"))
 
     @staticmethod
-    def GoalText(metric:Metric, goal):
+    def goalText(metric:Metric, goal):
         if metric == Task.Metric.Accuracy:
             goal_text = f'正解率 <span style="color:#0dcaf0">{goal*100:.1f}</span> % 以上'
         elif metric == Task.Metric.MAE:
@@ -183,7 +186,6 @@ class Task:
 
 
 class Stats:
-    username : str
     userid : str
     datetime : datetime
     filename : str = ""
@@ -196,8 +198,7 @@ class Stats:
     goal: float
 
     # ユーザ成績のcsvファイルに書かれた1行の成績記録をもとにstatsを読み取る
-    def __init__(self, user_stats_line:str, username, metric:Task.Metric, goal:float, userid) -> None:
-        self.username = username
+    def __init__(self, user_stats_line:str, metric:Task.Metric, goal:float, userid) -> None:
         self.userid = userid
         self.metric = metric
         self.goal = goal
@@ -268,7 +269,7 @@ class Stats:
 
 
     @staticmethod
-    def GetBestStats(stats:list, task:Task):
+    def getBestStats(stats:list, task:Task):
         def compare(a:Stats, b:Stats):
             goal = a.goal
             train_a = a.train

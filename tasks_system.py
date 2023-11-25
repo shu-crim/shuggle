@@ -17,9 +17,6 @@ import chardet
 import random
 
 
-UPLOAD_DIR_NAME = r"upload"
-USER_MODULE_DIR_NAME = r"user_module"
-TIMESTAMP_FILE_NAME = r"timestamp.txt"
 FILENAME_DATASET_JSON = r"dataset.json"
 PROC_TIMEOUT_SEC = 1
 
@@ -29,7 +26,7 @@ def UpdateTtimestamp(task_id):
     if not os.path.exists(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME)):
         os.makedirs(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME))
 
-    with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
+    with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, Task.TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
@@ -127,7 +124,7 @@ class Result:
 def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch, contest:bool=False, timelimit_per_data=PROC_TIMEOUT_SEC):
     try:
         # ユーザ作成の処理を読み込む
-        user_module = importlib.import_module(f"{Task.TASKS_DIR}.{task_id}.{USER_MODULE_DIR_NAME}.{module_name}")
+        user_module = importlib.import_module(f"{Task.TASKS_DIR}.{task_id}.{Task.USER_MODULE_DIR_NAME}.{module_name}")
     except:
         raise(ValueError("モジュールを読み込めません。"))
     
@@ -355,7 +352,7 @@ def main():
                 task_id = os.path.basename(os.path.dirname(dir_task))
 
                 # ディレクトリの一覧を作成して走査
-                dir_list_users = glob.glob(os.path.join(dir_task, UPLOAD_DIR_NAME, '**/'))
+                dir_list_users = glob.glob(os.path.join(dir_task, Task.UPLOAD_DIR_NAME, '**/'))
                 for dir_user in dir_list_users:  
                     # ディレクトリ名を取得→ユーザ名として使う
                     user_name = os.path.basename(os.path.dirname(dir_user))
@@ -369,7 +366,7 @@ def main():
                     path = py_files[0] # 最初に発見したファイルのみを対象とする
 
                     # モジュール移動先が無ければ生成(新規Taskの実行時)
-                    dir_user_module = os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME)
+                    dir_user_module = os.path.join(Task.TASKS_DIR, task_id, Task.USER_MODULE_DIR_NAME)
                     if not os.path.exists(dir_user_module):
                         os.makedirs(dir_user_module)
 
@@ -393,7 +390,7 @@ def main():
                             with open(path + '.txt', encoding='utf-8') as f:
                                 memo = f.read()
 
-                            shutil.move(path + '.txt', os.path.join(Task.TASKS_DIR, task_id, USER_MODULE_DIR_NAME, new_filename + '.txt'))
+                            shutil.move(path + '.txt', os.path.join(Task.TASKS_DIR, task_id, Task.USER_MODULE_DIR_NAME, new_filename + '.txt'))
                         except Exception as e:
                             print(f"read {path + '.txt'}: {e}")
                     
