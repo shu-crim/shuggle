@@ -13,6 +13,8 @@ class Task:
     TASKS_DIR =r"tasks"
     FILENAME_TASK_JSON = r"task.json"
     BACKUP_DIR_NAME = r"backup"
+    OUTPUT_DIR_NAME = r"output"
+    USER_RESULT_DIR_NAME = "user"
 
     class AnswerValueType(Enum):
         real = 1

@@ -18,7 +18,6 @@ import random
 
 
 UPLOAD_DIR_NAME = r"upload"
-OUTPUT_DIR_NAME = r"output"
 USER_MODULE_DIR_NAME = r"user_module"
 TIMESTAMP_FILE_NAME = r"timestamp.txt"
 FILENAME_DATASET_JSON = r"dataset.json"
@@ -27,10 +26,10 @@ PROC_TIMEOUT_SEC = 1
 
 def UpdateTtimestamp(task_id):
     # ディレクトリが無ければ作成
-    if not os.path.exists(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME)):
-        os.makedirs(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME))
+    if not os.path.exists(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME)):
+        os.makedirs(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME))
 
-    with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
+    with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, TIMESTAMP_FILE_NAME), "w", encoding='utf-8') as f:
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
@@ -256,7 +255,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
-        with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "detail", output_csv_filename), "w", encoding='utf-8') as output_csv_file:
+        with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "detail", output_csv_filename), "w", encoding='utf-8') as output_csv_file:
             # 集計
             output_csv_file.write(f"filename,{os.path.basename(new_filename)}\n\n")
             output_csv_file.write("type,num_data,{0}\n".format(
@@ -284,7 +283,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                     output_csv_file.write(f"{result.data_type.name},{str(result.filename).replace(',', '-')},{result.correct},{result.answer},{np.abs(result.answer - result.correct)}\n")
 
     # ユーザ毎の結果出力
-    csv_path = os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", user_name + ".csv")
+    csv_path = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", user_name + ".csv")
     if not os.path.exists(csv_path):
         # ファイルが無いのでヘッダを付ける
         with open(csv_path, "w", encoding='utf-8') as output_csv_file:
@@ -329,7 +328,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
     # 処理中であることを示すファイルを削除
     try:
-        os.remove(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", f"{user_name}_inproc"))
+        os.remove(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", f"{user_name}_inproc"))
     except:
         print(f"{user_name}_inproc を削除できませんでした。")
 
@@ -403,11 +402,11 @@ def main():
                     print(f"{path} -> {new_filename}")
 
                     # 出力先ディレクトリが存在しない場合は生成(新規Taskの実行時)
-                    dir_output_user = os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user")
+                    dir_output_user = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user")
                     if not os.path.exists(dir_output_user):
                         os.makedirs(dir_output_user)
 
-                    dir_output_detail = os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "detail")
+                    dir_output_detail = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "detail")
                     if not os.path.exists(dir_output_detail):
                         os.makedirs(dir_output_detail)
 

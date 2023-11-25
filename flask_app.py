@@ -12,34 +12,18 @@ from enum import Enum
 import shutil
 
 from task import Task, Stats, Log
+from module.user import User
 
 
-OUTPUT_DIR_NAME = r"output"
 UPLOAD_DIR_NAME = r"upload"
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
 SETTING = None
-USER_CSV_PATH = r"./data/users.csv"
 SETTING_JSON_PATH = r"./data/setting.json"
 HASH_METHOD = "pbkdf2:sha256:260000"
 USER_MODULE_DIR_NAME = r"user_module"
 COOKIE_KEY = "user"
 COOKIE_AGE_SEC = 60 * 60 * 24 * 365
-
-
-class UserData():
-    id : str
-    email : str
-    pass_hash : str
-    name : str
-    key : str
-
-    def __init__(self, id="", email="", pass_hash="", name="", key="") -> None:
-        self.id = id
-        self.email = email
-        self.pass_hash = pass_hash
-        self.name = name
-        self.key = key
 
 
 class Page(Enum):
@@ -57,123 +41,7 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 
 app.config['SECRET_KEY'] = 'secret key here'
 
 
-def ReadUsersCsv(path:str):
-    users = {}
-    try:
-        with open(path, encoding='utf-8') as f:
-            f.readline() # ヘッダを読み飛ばす
-            while True:
-                line = f.readline()
-                if not line:
-                    break
-                if len(line.rstrip().split(',')) != 5:
-                    continue
-                email, id, name, key, pass_hash = line.rstrip().split(',')
-                users[id] = UserData(id, email, pass_hash, name, key)
-    except:
-        return {}
 
-    return users
-
-
-def WriteUsersCsv(path:str, users:dict, must_backup:bool=True) -> bool:
-    # バックアップをとる
-    if os.path.exists(path):
-        try:
-            backup_dir = os.path.join(os.path.dirname(path), "backup")
-            if not os.path.exists(backup_dir):
-                os.makedirs(backup_dir)
-            shutil.copy2(path, os.path.join(backup_dir, datetime.datetime.now().strftime('users_%Y%m%d_%H%M%S_%f.csv')))
-        except:
-            if must_backup:
-                return False
-            
-    # ディレクトリが無ければ作成
-    if not os.path.exists(os.path.dirname(path)):
-        os.makedirs(os.path.dirname(path))
-    
-    # 上書き作成する
-    try:
-        with open(path, mode='w', encoding='utf-8') as f:
-            f.write('email,id,name,key,pass-hash\n')
-            for id, user_data in users.items():
-                f.write(f"{user_data.email},{id},{user_data.name},{user_data.key},{user_data.pass_hash}\n")
-    except:
-        return False
-    
-    return True
-
-
-def AddUsersCsv(path:str, id:str, email:str, name:str, pass_hash:str, key:str) -> bool:
-    # ユーザデータを読み込む
-    users = ReadUsersCsv(path)
-    if users == None:
-        users = {}
-
-    # 重複チェック
-    if id in users:
-        return False
-
-    # ユーザデータを追加する
-    users[id] = UserData(id, email, pass_hash, name, key)
-
-    # 書き込んで結果を返す
-    return WriteUsersCsv(path, users, True if os.path.exists(path) else False)
-
-
-def UpdateUsersCsv(path:str, id:str, target:str, value:str) -> bool:
-    users = ReadUsersCsv(path)
-    if users == None:
-        return False
-    if not id in users:
-        return False
-    
-    # 更新する
-    if target == 'key':
-        users[id].key = value
-    elif target == 'name':
-        users[id].name = value
-    elif target == 'pass_hash':
-        users[id].pass_hash = value
-    elif target == 'email':
-        users[id].email = value
-    else:
-        return False
-
-    # 書き込んで結果を返す
-    return WriteUsersCsv(path, users)
-
-
-def GetUserStats(task_id) -> {}:
-    # Task情報からmetricを読み込む
-    task = Task(task_id)
-    
-    # ユーザ情報を読み込む
-    users = ReadUsersCsv(USER_CSV_PATH)
-
-    file_paths = glob.glob(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", "*.csv"))
-    stats = {}
-    for file_path in file_paths:
-        user_id = os.path.splitext(os.path.basename(file_path))[0]
-        if not user_id in users:
-            continue
-        user_name = users[user_id].name
-        stats[user_id] = []
-        
-        with open(file_path, "r", encoding='utf-8') as csv_file:
-            line = csv_file.readline() # ヘッダ読み飛ばし
-            while True:
-                line = csv_file.readline()
-                if not line:
-                    break
-
-                stats[user_id].append(Stats(line, user_name, task.metric, task.goal, user_id))
-
-        # ひとつもstatsがなかった場合はキーを削除
-        if len(stats[user_id]) == 0:
-            stats.pop(user_id)
-
-    return stats
 
 
 def menuHTML(page, task_id="", url_from="", admin=False):
@@ -368,11 +236,11 @@ def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=Fals
 
 def CreateInProcHtml(task_id):
     # ユーザ情報を読み込む
-    users = ReadUsersCsv(USER_CSV_PATH)
+    users = User.ReadUsersCsv(User.USER_CSV_PATH)
 
     inproc_text = ''
     for user_id in users:
-        if os.path.exists(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "user", f"{user_id}_inproc")):
+        if os.path.exists(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", f"{user_id}_inproc")):
             inproc_text += f"{users[user_id].name} さんの評価を実行中です。<br>"
 
     return inproc_text + '<br>'
@@ -384,7 +252,7 @@ def CreateMyTaskTable(user_id) -> str:
     # user_idのstatsをTaskごとに取得
     for task_id, task in TASK.items():
         task:Task = task
-        user_stats = GetUserStats(task_id)
+        user_stats = User.GetUserStats(task_id)
         if user_id in user_stats:
             stats = user_stats[user_id]
 
@@ -504,7 +372,7 @@ def CreateSubmitTable(user_id) -> str:
 
     # user_idのstatsをTaskごとに取得
     for task_id, task in TASK.items():
-        stats_temp = GetUserStats(task_id)
+        stats_temp = User.GetUserStats(task_id)
         if user_id in stats_temp:
             for item in stats_temp[user_id]:
                 submit: Submit = Submit()
@@ -550,17 +418,17 @@ def CreateUserTable() -> str:
     html_table += "<tbody>"
 
     # ユーザ情報を読み込む
-    users = ReadUsersCsv(USER_CSV_PATH)
+    users = User.ReadUsersCsv(User.USER_CSV_PATH)
 
     for user_id, user in users.items():
-        user_data:UserData = user
+        user_data:User.UserData = user
 
         # 最新の提出を抽出
         latest_datetime:datetime.datetime = datetime.datetime(1984, 4, 22)
         latest_submit_task:Task = None
         num_submit = 0
         for task_id, task in TASK.items():
-            stats_temp = GetUserStats(task_id)
+            stats_temp = User.GetUserStats(task_id)
             if not user_id in stats_temp:
                 continue
             num_submit += len(stats_temp[user_id])
@@ -631,7 +499,7 @@ def CreateTaskTable(tasks) -> str:
 
 def VerifyEmailAndPassword(email, password):
     # ユーザ情報を読み込む
-    users = ReadUsersCsv(USER_CSV_PATH)
+    users = User.ReadUsersCsv(User.USER_CSV_PATH)
     
     # 認証を行う
     verified = False
@@ -648,7 +516,7 @@ def VerifyEmailAndPassword(email, password):
 
 def VerifyIdAndKey(user_id, user_key):
     # ユーザ情報を読み込む
-    users = ReadUsersCsv(USER_CSV_PATH)
+    users = User.ReadUsersCsv(User.USER_CSV_PATH)
     
     # 認証を行う
     verified = False
@@ -657,7 +525,7 @@ def VerifyIdAndKey(user_id, user_key):
         if user_data.key == user_key:
             verified = True
     else:
-        user_data = UserData()
+        user_data = User.UserData()
 
     return verified, user_data
 
@@ -784,7 +652,7 @@ def join():
             return render_template(f'join.html', from_url=from_url, message="再入力したパスワードが一致していません。")
         
         # ユーザ情報を読み込む
-        users = ReadUsersCsv(USER_CSV_PATH)
+        users = User.ReadUsersCsv(User.USER_CSV_PATH)
 
         # email重複チェック
         duplicate = False
@@ -818,7 +686,7 @@ def join():
 
         # ユーザ登録
         name = email.split('@')[0]
-        success = AddUsersCsv(USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
+        success = User.AddUsersCsv(User.USER_CSV_PATH, user_id, email, name, pass_hash, user_key)
 
         if not success:
             Log.write(f"Failed to create account. AddUsersCsv() error. email: {email}")
@@ -858,7 +726,7 @@ def login():
         user_key = str(uuid.uuid4()).split('-')[0]
 
         # キーを保存
-        UpdateUsersCsv(USER_CSV_PATH, user_data.id, 'key', user_key)
+        User.UpdateUsersCsv(User.USER_CSV_PATH, user_data.id, 'key', user_key)
 
         # ユーザ情報をクッキーに書き込み
         response = make_response(
@@ -911,7 +779,7 @@ def user():
             if 'buttonChangeName' in request.form:
                 # 名前を変更
                 new_name = request.form['newName']
-                success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'name', new_name)
+                success = User.UpdateUsersCsv(User.USER_CSV_PATH, user_id, 'name', new_name)
                 if not success:
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
@@ -929,7 +797,7 @@ def user():
                 
                 # パスワードをハッシュ化
                 pass_hash = generate_password_hash(password, salt_length=21)
-                success = UpdateUsersCsv(USER_CSV_PATH, user_id, 'pass_hash', pass_hash)
+                success = User.UpdateUsersCsv(User.USER_CSV_PATH, user_id, 'pass_hash', pass_hash)
                 if not success:
                     message = 'ユーザ情報の更新に失敗しました。'
                     raise(ValueError())
@@ -1010,7 +878,7 @@ def task_index(task_id):
 @app.route('/<task_id>/timestamp', methods=['GET'])
 def get_timestamp(task_id):
     try:
-        with open(os.path.join(Task.TASKS_DIR, task_id, OUTPUT_DIR_NAME, "timestamp.txt"), "r", encoding='utf-8') as f:
+        with open(os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "timestamp.txt"), "r", encoding='utf-8') as f:
             timestamp = f.read()
     except:
         timestamp = ''
@@ -1052,7 +920,7 @@ def board(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = GetUserStats(task_id)
+    user_stats = User.GetUserStats(task_id)
 
     # ユーザごとに表示最優先の成績を選択
     best_stats_every_user = []
@@ -1125,7 +993,7 @@ def log(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = GetUserStats(task_id)
+    user_stats = User.GetUserStats(task_id)
 
     # 辞書をリスト化してソート
     unlock = False
@@ -1225,7 +1093,7 @@ def admin(task_id):
     task:Task = Task(task_id)
 
     # ユーザ成績を読み込む
-    user_stats = GetUserStats(task_id)
+    user_stats = User.GetUserStats(task_id)
 
     # 辞書をリスト化してソート
     stats_list = []
