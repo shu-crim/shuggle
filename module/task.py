@@ -184,6 +184,43 @@ class Task:
         
         return True
 
+    def achieve(self, stats) -> bool:
+        achieve = True
+
+        if self.metric == Task.Metric.Accuracy:
+            if stats.train < self.goal or stats.valid < self.goal or (self.type == Task.TaskType.Contest and stats.test < self.goal):
+                achieve = False
+                
+        elif self.metric == Task.Metric.MAE:
+            if stats.train > self.goal or stats.valid > self.goal or (self.type == Task.TaskType.Contest and stats.test > self.goal):
+                achieve = False
+
+        return achieve
+
+
+    def achieveStarHTML(self, stats):
+        # コンテスト中の場合は非表示
+        if self.type == Task.TaskType.Contest and datetime.datetime.now() < self.end_date:
+            return ''
+        
+        if not self.achieve(stats):
+            return ''
+
+        return f'<span style="color:#0dcaf0">{"★" if self.type == Task.TaskType.Contest else "☆"}</span>'
+
+
+    @staticmethod
+    def achieveValue(metric:Metric, evaluated_value, goal) -> bool:
+        achieve = False
+        if metric == Task.Metric.Accuracy:
+            if evaluated_value >= goal:
+                achieve = True
+        elif metric == Task.Metric.MAE:
+            if evaluated_value <= goal:
+                achieve = True
+
+        return achieve
+
 
 class Stats:
     userid : str

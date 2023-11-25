@@ -96,16 +96,29 @@ class User:
 
     @staticmethod
     def numAchievement(user_id:str):
+        num_achieve_contest = 0
+        num_achieve_quest = 0
+
         # ディレクトリの一覧を作成して走査
         dir_list_tasks = glob.glob(os.path.join(Task.TASKS_DIR, '**/'))
         for dir_task in dir_list_tasks:                    
             # ディレクトリ名を取得→タスクIDとして使う
             task_id = os.path.basename(os.path.dirname(dir_task))
+            task:Task = Task(task_id)
 
-            # ユーザの成績があれば読み込み
-            # user_result_path = os.path.join(dir_task, Task.OUTPUT_DIR_NAME, Task.USER_RESULT_DIR_NAME, f"{user_id}.csv")
-            # if os.path.exists(user_result_path):
+            # ユーザの成績を読み込み
+            user_stats = User.readUserStats(user_id, task_id)
 
+            # 目標達成チェック
+            for stats in user_stats:
+                if task.achieve(stats):
+                    if task.type == Task.TaskType.Contest:
+                        num_achieve_contest += 1
+                    elif task.type == Task.TaskType.Quest:
+                        num_achieve_quest += 1
+                    break
+
+        return num_achieve_contest, num_achieve_quest
 
 
     @staticmethod

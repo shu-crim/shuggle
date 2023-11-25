@@ -99,38 +99,15 @@ def menuHTML(page, task_id="", url_from="", admin=False):
 
 
 def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
-    achieve = False
-    if metric == Task.Metric.Accuracy:
-        if evaluated_value >= goal:
-            achieve = True
-    elif metric == Task.Metric.MAE:
-        if evaluated_value <= goal:
-            achieve = True
-    
+    achieve = Task.achieveValue(metric, evaluated_value, goal)
     return ' style="color:#0dcaf0"' if achieve else ''
-
-
-def Achieve(task:Task, stats:Stats):
-    # コンテスト中の場合は非表示
-    if task.type == Task.TaskType.Contest and datetime.datetime.now() < task.end_date:
-        return ''
-
-    result = f'<span style="color:#0dcaf0">{"★" if task.type == Task.TaskType.Contest else "☆"}</span>'
-    if task.metric == Task.Metric.Accuracy:
-        if stats.train < task.goal or stats.valid < task.goal or (task.type == Task.TaskType.Contest and stats.test < task.goal):
-            result = ''
-    elif task.metric == Task.Metric.MAE:
-        if stats.train > task.goal or stats.valid > task.goal or (task.type == Task.TaskType.Contest and stats.test > task.goal):
-            result = ''
-
-    return result
 
 
 def CreateTableRow(stats:Stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
     html_user = ""
     html_user += f'<tr>'
-    html_user += f'<td>{User.userIDtoUserName(stats.userid)} {Achieve(task, stats)}</td>'
-    if unlock and AchieveGoal(task, stats):
+    html_user += f'<td>{User.userIDtoUserName(stats.userid)} {task.achieveStarHTML(stats)}</td>'
+    if unlock and task.achieve(stats):
         html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
     else:
         html_user += f'<td>{stats.datetime}</td>'
@@ -297,7 +274,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
         html_temp = ""
         if submit.task.metric == Task.Metric.Accuracy:
             if goal:
-                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {Achieve(submit.task, submit.stats)}</td>'
+                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {submit.task.achieveStarHTML(submit.stats)}</td>'
             if submit.stats.train < 0:
                 if visible_invalid_data:
                     html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
@@ -311,7 +288,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
                         html_temp += '<td>-</td>'
                     elif submit.task.type == Task.TaskType.Contest:
                         unlock = False
-                        if AchieveGoal(submit.task, submit.stats):
+                        if submit.task.achieve(submit.stats):
                             # Questであればいつでも、Contestであれば期間終了後にロック解除
                             if datetime.datetime.now() >= submit.task.end_date: 
                                 html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
@@ -321,7 +298,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
 
         elif submit.task.metric == Task.Metric.MAE:
             if goal:
-                html_temp += f'<td>MAE <span style="color:#0dcaf0">{submit.task.goal:.1f}</span> 以下 {Achieve(submit.task, submit.stats)}</td>'
+                html_temp += f'<td>MAE <span style="color:#0dcaf0">{submit.task.goal:.1f}</span> 以下 {submit.task.achieveStarHTML(submit.stats)}</td>'
             try:
                 if submit.stats.train < 0:
                     if visible_invalid_data:
@@ -336,7 +313,7 @@ def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=Fa
                             html_temp += '<td>-</td>'
                         elif submit.task.type == Task.TaskType.Contest:
                             unlock = False
-                            if AchieveGoal(submit.task, submit.stats):
+                            if submit.task.achieve(submit.stats):
                                 # Questであればいつでも、Contestであれば期間終了後にロック解除
                                 if datetime.datetime.now() >= submit.task.end_date: 
                                     html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test:.3f}(MAE)</td>'
@@ -543,23 +520,6 @@ def VerifyByCookie(request):
         print("cookieによる認証に失敗しました。")
 
     return verified, user_data, admin
-
-
-def AchieveGoal(task:Task, stats:Stats):
-    results = [stats.train, stats.valid]
-
-    if task.type == Task.TaskType.Contest:
-        results.append(stats.test)
-
-    for result in results:
-        if task.metric == Task.Metric.Accuracy:
-            if result < task.goal:
-                return False
-        elif task.metric == Task.Metric.MAE:
-            if result > task.goal:
-                return False
-
-    return True
 
 
 @app.route('/')
@@ -949,7 +909,7 @@ def board(task_id):
     unlock = False
     if verified and my_stats is not None:
         # ユーザの認証ができている場合、このタスクの目標を達成しているか確認
-        if AchieveGoal(task, my_stats):
+        if task.achieve(my_stats):
             # Questであればいつでも、Contestであれば期間終了後にロック解除
             if task.type == Task.TaskType.Quest:
                 unlock = True
@@ -995,7 +955,7 @@ def log(task_id):
     for stats in user_stats.values():
         for item in stats:
             stats_list.append(item)
-            if verified and item.userid == user_data.id and AchieveGoal(task, item):
+            if verified and item.userid == user_data.id and task.achieve(item):
                 # Questであればいつでも、Contestであれば期間終了後にロック解除
                 if task.type == Task.TaskType.Quest:
                     unlock = True
