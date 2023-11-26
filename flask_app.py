@@ -38,7 +38,7 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 #ファイルサイズ制限 
 app.config['SECRET_KEY'] = 'secret key here'
 
 
-def menuHTML(page, task_id="", url_from="", admin=False):
+def menuHTML(page, task_id="", url_from="", admin=False, user_name=""):
     html = """
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
@@ -87,7 +87,9 @@ def menuHTML(page, task_id="", url_from="", admin=False):
                     </ul>
                     <ul class="navbar-nav ml-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a id="login-user-name" class="nav-link active" aria-current="page" href="/user/info{'?from=' + url_from if url_from != '' else ''}"></a>
+                            <a id="login-user-name" class="nav-link active" aria-current="page" href="/user/info{'?from=' + url_from if url_from != '' else ''}">
+                                {user_name + ' さんのユーザページ' if user_name != '' else 'ログイン'}
+                            </a>
                         </li>
                     </ul>
                 </div>
@@ -517,7 +519,8 @@ def index():
             if admin:
                 task_list_prepare.append(info)
     
-    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"], menu=menuHTML(Page.HOME, url_from="/"), admin=admin)
+    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"],
+                           menu=menuHTML(Page.HOME, url_from="/", user_name=user_data.name if verified else ''), admin=admin)
 
 
 @app.route('/favicon.ico')
@@ -659,13 +662,19 @@ def user():
     verified, user_data, admin = VerifyByCookie(request)
     if not verified:
         return redirect(url_for('login'))
+    
+    # 提出テーブルを作成
+    my_task_table_html = CreateMyTaskTable(user_data.id)
+    submit_table_html = CreateSubmitTable(user_data.id)
 
     if request.method == 'GET':
         from_url = request.args.get('from')
         return render_template(
             f'user.html', login="false",
             user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
-            from_url=from_url if from_url is not None else "/")
+            from_url=from_url if from_url is not None else "/",
+            email=user_data.email, user_id=user_data.id, user_key=user_data.key,
+            my_task_table=Markup(my_task_table_html), submit_table=Markup(submit_table_html))
 
     elif request.method == 'POST':
         try:
@@ -677,7 +686,7 @@ def user():
         except:
             return render_template(f'user.html', message='ユーザ認証に失敗しました。')
         
-        new_name = ''
+        new_name = user_data.name
         message = ''
         try:
             if 'buttonChangeName' in request.form:
@@ -689,6 +698,7 @@ def user():
                     raise(ValueError())
                 message = 'ユーザ名を変更しました。'
                 Log.write(f"Success to change user name. user_id: {user_id}")
+
             elif 'buttonChangePassword' in request.form:
                 # パスワードを変更
                 password = request.form['inputPassword']
@@ -707,44 +717,26 @@ def user():
                     raise(ValueError())
                 message = 'パスワードを変更しました。'
                 Log.write(f"Success to change password. user_id: {user_id}")
+
         except:
             return render_template(f'user.html',
-                                    user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
-                                    message=message)
+                                    user_name=user_data.name, message=message, achievement=Markup(User.achievementStrHTML(user_data.id)),
+                                    email=user_data.email, user_id=user_data.id, user_key=user_data.key,
+                                    my_task_table=Markup(my_task_table_html), submit_table=Markup(submit_table_html))
 
         return render_template(f'user.html',
-                                user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
-                                update_user_data="true", message=message)
-
-
-@app.route('/my-task-table/<user_id>/<user_key>')
-def my_task_table(user_id, user_key):
-    # 認証
-    verified, user_data = VerifyIdAndKey(user_id, user_key)
-    if not verified:
-        return redirect(url_for('login'))
-    
-    # 提出Taskテーブルを作成
-    table_html = CreateMyTaskTable(user_id)
-
-    return table_html
-
-
-@app.route('/submit-table/<user_id>/<user_key>')
-def submit_table(user_id, user_key):
-    # 認証
-    verified, user_data = VerifyIdAndKey(user_id, user_key)
-    if not verified:
-        return redirect(url_for('login'))
-    
-    # 提出テーブルを作成
-    table_html = CreateSubmitTable(user_id)
-
-    return table_html
+                                user_name=new_name, message=message, achievement=Markup(User.achievementStrHTML(user_data.id)),
+                                email=user_data.email, user_id=user_data.id, user_key=user_data.key,
+                                my_task_table=Markup(my_task_table_html), submit_table=Markup(submit_table_html))
 
 
 @app.route('/source/<task_id>/<filename>')
 def source(task_id, filename):
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not verified:
+        return redirect(url_for('login'))
+
     file_path = os.path.join(Task.TASKS_DIR, task_id, Task.USER_MODULE_DIR_NAME, filename)
     if not os.path.exists(file_path):
         return render_template(f'source.html', filename='ファイルが見つかりません')
@@ -811,7 +803,7 @@ def task(task_id):
     task:Task = Task(task_id)
 
     return render_template(f'tasks/{task_id}/index.html',
-                           menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin),
+                           menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin, user_name=user_data.name if verified else ''),
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            goal=Task.goalText(task.metric, task.goal))
 
@@ -891,7 +883,7 @@ def board(task_id):
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_board=Markup(html_table),
                            table_contest_result=Markup(html_contest_result) if html_contest_result is not None else None,
-                           menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin),
+                           menu=menuHTML(Page.BOARD, task_id, url_from=f"/{task_id}/board", admin=admin, user_name=user_data.name if verified else ''),
                            inproc_text=Markup(CreateInProcHtml(task_id)),
                            goal=Task.goalText(task.metric, task.goal),
                            num_col=num_col, task_id=task_id
@@ -938,7 +930,7 @@ def log(task_id):
     return render_template('log.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_log=Markup(html_table),
-                           menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin), 
+                           menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin, user_name=user_data.name if verified else ''), 
                            inproc_text=Markup(CreateInProcHtml(task_id)), 
                            num_col=num_col,
                            task_id=task_id,
@@ -947,6 +939,11 @@ def log(task_id):
 
 @app.route('/<task_id>/upload', methods=['GET', 'POST'])
 def upload_file(task_id):
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not verified:
+        return redirect(url_for('login') + f'?from=/{task_id}/upload')
+
     if not task_id in TASK:
         return redirect(url_for('index'))
     
@@ -996,9 +993,12 @@ def upload_file(task_id):
                     msg = "アップロードに失敗しました。"
 
     # ユーザ認証
-    verified, user_data, admin = VerifyByCookie(request)
+    # verified, user_data, admin = VerifyByCookie(request)
 
-    return render_template('upload.html', task_id=task_id, task_name=task.name, message=msg, menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin), url_from=f"/{task_id}/upload", time_limit=task.timelimit_per_data)
+    return render_template('upload.html', task_id=task_id, task_name=task.name, message=msg,
+                           user_id=user_data.id, user_key=user_data.key,
+                           menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin, user_name=user_data.name if verified else ''),
+                           url_from=f"/{task_id}/upload", time_limit=task.timelimit_per_data)
   
 
 @app.route('/<task_id>/admin')
@@ -1036,9 +1036,10 @@ def admin(task_id):
                            task_id=task_id,
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_log=Markup(html_table),
-                           menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin),
+                           menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin, user_name=user_data.name if verified else ''),
                            inproc_text=Markup(CreateInProcHtml(task_id)),
                            num_col=num_col)
+
 
 @app.route('/admin', methods=['GET', 'POST'])
 def manage():

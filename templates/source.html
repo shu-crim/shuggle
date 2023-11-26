@@ -6,39 +6,6 @@
         <title>IR Tasks | {{filename}}</title>
         <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
         <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
-
-        <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
-
-        <script>
-            $(document).ready(function() {
-                // LocalStorageからデータ読み込み
-                var user_id = localStorage.getItem("user_id");
-                var user_name = localStorage.getItem("user_name");
-                var user_key = localStorage.getItem("user_key");
-                var user_email = localStorage.getItem("user_email");
-
-                // データがなければログイン画面へ
-                if (user_id == null || user_name == null || user_key == null || user_email == null){
-                    window.location.href = "/login";
-                }
-
-                // ユーザ情報を照合
-                var request = new XMLHttpRequest();
-                request.open("GET", "/verify/" + user_id + "/" + user_key, true);
-                request.onreadystatechange = function() {
-                    if (request.readyState == 4 && request.status == 200) {
-                        //受信完了時の処理
-                        var verify = document.createTextNode(decodeURI(request.responseText));
-                        if (verify.data == "true") {
-                        } else {
-                            // 照合に失敗したらログイン画面へ
-                            window.location.href = "/login";
-                        }
-                    }
-                }
-                request.send("");
-            });
-        </script>
     
     </head>
     <body>
@@ -57,6 +24,5 @@
         </div>
 
         <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
-        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
     </body>
 </html>

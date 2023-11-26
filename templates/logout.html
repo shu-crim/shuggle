@@ -9,13 +9,9 @@
 
         <script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
 
-<script>
+        <script>
             $(document).ready(function() {
                 // ログアウトする
-                localStorage.setItem('user_id', "");
-                localStorage.setItem('user_key', "");
-                localStorage.setItem('user_name', "");
-                localStorage.setItem('user_email', "");
                 window.location.href = "/";
             });
         </script>    

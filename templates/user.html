@@ -11,31 +11,10 @@
 
         <script>
             $(document).ready(function() {
-                var user_id = "{{user_id}}";
-                var user_name = "{{user_name}}";
-                var user_key = "{{user_key}}";
-                var user_email = "{{user_email}}";
                 var next_url = "{{next_url}}";
                 var login = "{{login}}";
-                var update_user_data = "{{update_user_data}}";
                 var url_from = "{{from_url}}";
                 
-                // ユーザ情報を保存
-                if (update_user_data == "true") {
-                    if (user_id != "") {
-                        localStorage.setItem('user_id', user_id);
-                    }
-                    if (user_key != "") {
-                        localStorage.setItem('user_key', user_key);
-                    }
-                    if (user_name != "") {
-                        localStorage.setItem('user_name', user_name);
-                    }
-                    if (user_email != "") {
-                        localStorage.setItem('user_email', user_email);
-                    }
-                }
-
                 // ログインしてきたときは自動で飛ぶ
                 if (login == "true") {
                     if (next_url != "") {
@@ -46,73 +25,6 @@
                     }                    
                     return;
                 }
-
-                // LocalStorageからデータ読み込み
-                var user_id = localStorage.getItem("user_id");
-                var user_name = localStorage.getItem("user_name");
-                var user_key = localStorage.getItem("user_key");
-                var user_email = localStorage.getItem("user_email");
-
-                // データがなければログイン画面へ
-                if (user_id == null || user_name == null || user_key == null || user_email == null ||
-                    user_id == "" || user_name == "" || user_key == "" || user_email == "") {
-
-                    url = "/login";
-                    if (url_from != "") {
-                        url += "?from=" + url_from;
-                    }
-                    window.location.href = url;
-                    return;
-                }
-
-                // ユーザ情報を照合
-                var request = new XMLHttpRequest();
-                request.open("GET", "/verify/" + user_id + "/" + user_key, true);
-                request.onreadystatechange = function() {
-                    if (request.readyState == 4 && request.status == 200) {
-                        //受信完了時の処理
-                        var verify = document.createTextNode(decodeURI(request.responseText));
-                        if (verify.data == "true") {
-                            // 照合に成功したらユーザ名を表示
-                            // document.getElementById('user-name').textContent = user_name;
-                            // document.getElementById('user-info-name').textContent = user_name;
-                            document.getElementById('user-info-email').textContent = user_email;
-                            document.getElementById('input-user-id').value = user_id;
-                            document.getElementById('input-user-key').value = user_key;
-                            document.getElementById('input-pass-user-id').value = user_id;
-                            document.getElementById('input-pass-user-key').value = user_key;
-                        
-                            // 提出タスクテーブルを挿入
-                            var request_task_table = new XMLHttpRequest();
-                            request_task_table.open("GET", "/my-task-table/" + user_id + "/" + user_key, true);
-                            request_task_table.onreadystatechange = function() {
-                                if (request_task_table.readyState == 4 && request_task_table.status == 200) {
-                                    //受信完了時の処理
-                                    var table_html = document.createTextNode(decodeURI(request_task_table.responseText));
-                                    document.getElementById('task-table').appendChild(stringToHTML(table_html.data));
-                                }
-                            }
-                            request_task_table.send("");
-
-                            // 提出テーブルを挿入
-                            var request_table = new XMLHttpRequest();
-                            request_table.open("GET", "/submit-table/" + user_id + "/" + user_key, true);
-                            request_table.onreadystatechange = function() {
-                                if (request_table.readyState == 4 && request_table.status == 200) {
-                                    //受信完了時の処理
-                                    var table_html = document.createTextNode(decodeURI(request_table.responseText));
-                                    document.getElementById('submit-table').appendChild(stringToHTML(table_html.data));
-                                }
-                            }
-                            request_table.send("");
-
-                        } else {
-                            // 照合に失敗したらログイン画面へ
-                            window.location.href = "/login";
-                        }
-                    }
-                }
-                request.send("");
             });
 
             function stringToHTML(str) {
@@ -171,6 +83,7 @@
                     <button class="w-100 p-2 btn btn-outline-light" style="pointer-events: none;">Email address</button>
                 </div>
                 <div class="container col-10 d-flex align-items-center" id="user-info-email">
+                    {{email}}
                 </div>
             </div>
             <br>
@@ -207,9 +120,9 @@
                         <form method="POST">
                             <div class="input-group mb-3">
                                 <input type="text" name="newName" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" class="form-control" placeholder="新しい表示ユーザ名" aria-describedby="button-addon2">
-                                <input type="submit" name="buttonChangeName" value="変更" class="btn btn-outline-info" type="button" id="button-addon2">
-                                <input type="hidden" name="userID" id="input-user-id" value="">
-                                <input type="hidden" name="userKey" id="input-user-key" value="">
+                                <input type="submit" name="buttonChangeName" value="変更" class="btn btn-outline-info" id="button-addon2">
+                                <input type="hidden" name="userID" id="input-user-id" value="{{user_id}}">
+                                <input type="hidden" name="userKey" id="input-user-key" value="{{user_key}}">
                             </div>
                         </form>
                         使える文字：半角英数、記号「_.-」
@@ -233,8 +146,8 @@
                             <input type="password" name="inputPasswordVerify" class="form-control" placeholder="Password" maxlength="18" pattern="^[\-\._0-9A-Za-z]+$" required>
                             使える文字：半角英数、記号「_.-」<br>
                             <input type="submit" name="buttonChangePassword" value="変更" class="btn btn-outline-info" type="button" style="margin-top:1rem;">
-                            <input type="hidden" name="userID" id="input-pass-user-id" value="">
-                            <input type="hidden" name="userKey" id="input-pass-user-key" value="">
+                            <input type="hidden" name="userID" id="input-pass-user-id" value="{{user_id}}">
+                            <input type="hidden" name="userKey" id="input-pass-user-key" value="{{user_key}}">
                         </form>
                     </div>
                 </div>
@@ -256,15 +169,16 @@
             <h2>提出した<span style="color:#00a497">T</span>ask一覧</h2>
         </div>
         <div class="container col-11" id="task-table">
+            {{my_task_table}}
         </div>
 
         <div class="container col-11">
             <h2>これまでの提出一覧</h2>
         </div>
         <div class="container col-11" id="submit-table">
+            {{submit_table}}
         </div>
 
         <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
-        <script type="text/javascript" src="{{url_for('static', filename='js/user.js')}}"></script>
     </body>
 </html>
