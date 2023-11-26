@@ -103,89 +103,44 @@ def EvaluatedValueStyle(metric:Task.Metric, evaluated_value, goal) -> str:
     return ' style="color:#0dcaf0"' if achieve else ''
 
 
-def CreateTableRow(stats:Stats, task:Task, test=False, message=False, memo=False, visible_invalid_result=False, unlock=False):
-    html_user = ""
-    html_user += f'<tr>'
-    html_user += f'<td>{User.userIDtoUserName(stats.userid)} {task.achieveStarHTML(stats)}</td>'
-    if unlock and task.achieve(stats):
-        html_user += f'<td><a href="/source/{task.id}/{stats.filename}" class="link-info">{stats.datetime}</a></td>'
-    else:
-        html_user += f'<td>{stats.datetime}</td>'
+class Submit:
+    stats:Stats
+    task:Task
 
-    html_temp = ""
-    if task.metric == Task.Metric.Accuracy:
-        if stats.train < 0:
-            if visible_invalid_result:
-                html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
-            else:
-                return ""
-        else:
-            html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.train, task.goal)}>{stats.train * 100:.2f} %</td>'
-            html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.valid, task.goal)}>{stats.valid * 100:.2f} %</td>'
-            if test:
-                if task.type == Task.TaskType.Contest:
-                    if unlock:
-                        html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test * 100:.2f} %</td>'
-                    else:
-                        html_temp += f'<td>?</td>'
-                else:
-                    html_temp += f'<td>-</td>'
-    
-    elif task.metric == Task.Metric.MAE:
-        if stats.train < 0:
-            if visible_invalid_result:
-                html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
-            else:
-                return ""
-        else:
-            try:
-                html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.train, task.goal)}>{stats.train:.3f}</td>'
-                html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.valid, task.goal)}>{stats.valid:.3f}</td>'
-                if test:
-                    if task.type == Task.TaskType.Contest:
-                        if unlock:
-                            html_temp += f'<td{EvaluatedValueStyle(task.metric, stats.test, task.goal)}>{stats.test:.3f}</td>'
-                        else:
-                            html_temp += f'<td>?</td>'
-                    else:
-                        html_temp += f'<td>-</td>'
-            except:
-                html_temp += ('<td>-</td><td>-</td><td>-</td>' if test else '<td>-</td><td>-</td>')
-
-    html_user += html_temp
-
-    if memo:
-        html_user += f'<td>{stats.memo}</td>'
-    if message:
-        html_user += f'<td>{stats.message}</td>'
-    html_user += f'</tr>'
-
-    return html_user
+    def __init__(self, stats:Stats, task:Task) -> None:
+        self.stats = stats
+        self.task = task
 
 
-def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=False, unlock=False, table_id='sortable-table'):
-    def metricName(metric: Task.Metric):
-        if metric == Task.Metric.Accuracy:
-            return '正解率'
-        elif metric == Task.Metric.MAE:
-            return '平均絶対誤差'
-        else:
-            return ''
+class UnlockMode(Enum):
+    UnlockAll = 0,
+    LockAll = 1,
+    UnlockAchieveStats = 2
 
+
+def CreateRecordTable(submit_list, table_id='', visible_invalid_data:bool=False, user_name=False, task_name=False, goal=False, test=False, memo:bool=False, message:bool=False, unlock_mode:UnlockMode=UnlockMode.LockAll):
+    # 表の見出しを作成
     num_col = 0
     html_table = ""
     html_table += f"<table class=\"table table-dark\" id=\"{table_id}\">"
     html_table += "<thead><tr>"
-    html_table += f"<th id=\"th-{num_col}\">参加者</th>"
-    num_col += 1
+    if user_name:
+        html_table += f"<th id=\"th-{num_col}\">参加者</th>"
+        num_col += 1
     html_table += f"<th id=\"th-{num_col}\">提出日時</th>"
     num_col += 1
-    html_table += f"<th id=\"th-{num_col}\">train(配布){metricName(task.metric)}</th>"
+    if task_name:
+        html_table += f"<th id=\"th-{num_col}\">Task</th>"
+        num_col += 1
+    if goal:
+        html_table += f"<th id=\"th-{num_col}\">Goal</th>"
+        num_col += 1
+    html_table += f"<th id=\"th-{num_col}\">train</th>"
     num_col += 1
-    html_table += f"<th id=\"th-{num_col}\">valid{metricName(task.metric)}</th>"
+    html_table += f"<th id=\"th-{num_col}\">valid</th>"
     num_col += 1
     if test:
-        html_table += f"<th id=\"th-{num_col}\">test{metricName(task.metric)}</th>"
+        html_table += f"<th id=\"th-{num_col}\">test</th>"
         num_col += 1
     if memo:
         html_table += f"<th id=\"th-{num_col}\">メモ</th>"
@@ -196,13 +151,110 @@ def CreateBoardTable(stats_list, task:Task, test=False, message=False, memo=Fals
     html_table += "</tr></thead>"
     html_table += "<tbody>"
 
-    for stats in stats_list:
-        html_table += CreateTableRow(stats, task, test=test, message=message, memo=memo, unlock=unlock)
+    # 各提出の行を作成
+    for submit in submit_list:
+        html_table += CreateRecordTableRow(
+            submit, visible_invalid_data, user_name, task_name, goal, test, memo, message,
+            True if (unlock_mode == UnlockMode.UnlockAll) or (unlock_mode == UnlockMode.UnlockAchieveStats and submit.task.achieve(submit.stats)) else False
+        )
 
     html_table += "</tbody>"
     html_table += "</table>"
 
     return html_table, num_col
+
+
+def CreateRecordTableRow(submit:Submit, visible_invalid_data:bool=False, user_name=False, task_name=False, goal=False, test=False, memo:bool=True, message:bool=True, unlock=False):
+    try:
+        html_submit = ""
+        html_submit += f'<tr>'
+
+        # ユーザ名:選択
+        if user_name:
+            html_submit += f'<td>{User.userIDtoUserName(submit.stats.userid)} {submit.task.achieveStarHTML(submit.stats)}</td>'
+
+        # 提出日時:必ず入る
+        if unlock:
+            html_submit += f'<td><a href="/source/{submit.task.id}/{submit.stats.filename}" class="link-info">{submit.stats.datetime}</a></td>'
+        else:
+            html_submit += f'<td>{submit.stats.datetime}</td>'
+
+        # Task名:選択
+        if task_name:
+            html_submit += f'<td><a href="/{submit.task.id}/task" class="link-info">{submit.task.name}</a></td>'
+
+        html_temp = ""
+        if submit.task.metric == Task.Metric.Accuracy:
+            # Goal:選択
+            if goal:
+                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {submit.task.achieveStarHTML(submit.stats)}</td>'
+            
+            if submit.stats.train < 0:
+                if visible_invalid_data:
+                    html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
+                else:
+                    return ""
+            else:
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
+                
+                # Test:選択
+                if test:
+                    if submit.task.type == Task.TaskType.Quest:
+                        html_temp += '<td>-</td>'
+                    elif submit.task.type == Task.TaskType.Contest:
+                        unlock = False
+                        if submit.task.achieve(submit.stats):
+                            # Questであればいつでも、Contestであれば期間終了後にロック解除
+                            if submit.task.afterContest(): 
+                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
+                                unlock = True
+                        if not unlock:
+                            html_temp += f'<td>?</td>'
+
+        elif submit.task.metric == Task.Metric.MAE:
+            # Goal:選択
+            if goal:
+                html_temp += f'<td>MAE <span style="color:#0dcaf0">{submit.task.goal:.1f}</span> 以下 {submit.task.achieveStarHTML(submit.stats)}</td>'
+
+            # invalid判定
+            if submit.stats.train < 0:
+                if visible_invalid_data:
+                    html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
+                else:
+                    return ""
+                
+            else:
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train:.3f}(MAE)</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid:.3f}(MAE)</td>'
+                
+                # Test:選択
+                if test:
+                    if submit.task.type == Task.TaskType.Quest:
+                        html_temp += '<td>-</td>'
+                    elif submit.task.type == Task.TaskType.Contest:
+                        unlock = False
+                        if submit.task.achieve(submit.stats):
+                            # Questであればいつでも、Contestであれば期間終了後にロック解除
+                            if submit.task.afterContest(): 
+                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test:.3f}(MAE)</td>'
+                                unlock = True
+                        if not unlock:
+                            html_temp += f'<td>?</td>'
+
+        html_submit += html_temp
+
+        if memo:
+            html_submit += f'<td>{submit.stats.memo}</td>'
+        if message:
+            html_submit += f'<td>{submit.stats.message}</td>'
+
+        html_submit += f'</tr>'
+    except Exception as e:
+        print(e)
+        return ""
+
+    return html_submit
 
 
 def CreateInProcHtml(task_id):
@@ -230,112 +282,17 @@ def CreateMyTaskTable(user_id) -> str:
             # 表示最優先の成績を選択
             best_stats = Stats.getBestStats(stats, task)
             if best_stats is not None:
-                submit:Submit = Submit()
-                submit.stats = best_stats
-                submit.task = task
+                submit:Submit = Submit(best_stats, task)
                 submits.append(submit)
 
     # 提出日時でソート
     sorted_submits = sorted(submits, key=lambda x: x.stats.datetime, reverse=True)
-    
+
     # 表のHTMLを作成
-    html_table = '<table class="table table-dark">'
-    html_table += "<thead><tr>"
-    html_table += "<th>提出日時</th>"
-    html_table += "<th>Task</th>"
-    html_table += "<th>Goal</th>"
-    html_table += "<th>train</th>"
-    html_table += "<th>valid</th>"
-    html_table += "<th>test</th>"
-    html_table += "</tr></thead>"
-    html_table += "<tbody>"
-
-    for submit in sorted_submits:
-        html_table += CreateSubmitTableRow(submit, goal=True, test=True, memo=False, message=False)
-
-    html_table += "</tbody>"
-    html_table += "</table>"
-
+    html_table, num_col = CreateRecordTable(sorted_submits, goal=True, test=True,
+                                            task_name=True, unlock_mode=UnlockMode.UnlockAll)
+    
     return html_table
-
-
-class Submit:
-    stats: Stats
-    task: Task
-
-
-def CreateSubmitTableRow(submit:Submit, visible_invalid_data:bool=False, goal=False, test=False, memo:bool=True, message:bool=True):
-    try:
-        html_submit = ""
-        html_submit += f'<tr>'
-        html_submit += f'<td><a href="/source/{submit.task.id}/{submit.stats.filename}" class="link-info">{submit.stats.datetime}</a></td>'
-        html_submit += f'<td><a href="/{submit.task.id}/task" class="link-info">{submit.task.name}</a></td>'
-
-        html_temp = ""
-        if submit.task.metric == Task.Metric.Accuracy:
-            if goal:
-                html_temp += f'<td>正解率 <span style="color:#0dcaf0">{submit.task.goal*100:.0f}</span> &percnt; 以上 {submit.task.achieveStarHTML(submit.stats)}</td>'
-            if submit.stats.train < 0:
-                if visible_invalid_data:
-                    html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
-                else:
-                    return ""
-            else:
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train * 100:.2f} &percnt;</td>'
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid * 100:.2f} &percnt;</td>'
-                if test:
-                    if submit.task.type == Task.TaskType.Quest:
-                        html_temp += '<td>-</td>'
-                    elif submit.task.type == Task.TaskType.Contest:
-                        unlock = False
-                        if submit.task.achieve(submit.stats):
-                            # Questであればいつでも、Contestであれば期間終了後にロック解除
-                            if submit.task.afterContest(): 
-                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test * 100:.2f} &percnt;</td>'
-                                unlock = True
-                        if not unlock:
-                            html_temp += f'<td>?</td>'
-
-        elif submit.task.metric == Task.Metric.MAE:
-            if goal:
-                html_temp += f'<td>MAE <span style="color:#0dcaf0">{submit.task.goal:.1f}</span> 以下 {submit.task.achieveStarHTML(submit.stats)}</td>'
-            try:
-                if submit.stats.train < 0:
-                    if visible_invalid_data:
-                        html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
-                    else:
-                        return ""
-                else:
-                    html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train:.3f}(MAE)</td>'
-                    html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid:.3f}(MAE)</td>'
-                    if test:
-                        if submit.task.type == Task.TaskType.Quest:
-                            html_temp += '<td>-</td>'
-                        elif submit.task.type == Task.TaskType.Contest:
-                            unlock = False
-                            if submit.task.achieve(submit.stats):
-                                # Questであればいつでも、Contestであれば期間終了後にロック解除
-                                if submit.task.afterContest(): 
-                                    html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test:.3f}(MAE)</td>'
-                                    unlock = True
-                            if not unlock:
-                                html_temp += f'<td>?</td>'
-            except:
-                html_temp += '<td>-</td><td>-</td>'
-
-        html_submit += html_temp
-
-        if memo:
-            html_submit += f'<td>{submit.stats.memo}</td>'
-        if message:
-            html_submit += f'<td>{submit.stats.message}</td>'
-
-        html_submit += f'</tr>'
-    except Exception as e:
-        print(e)
-        return ""
-
-    return html_submit
 
 
 def CreateSubmitTable(user_id) -> str:
@@ -346,31 +303,16 @@ def CreateSubmitTable(user_id) -> str:
         stats_temp = User.getUserStats(task_id)
         if user_id in stats_temp:
             for item in stats_temp[user_id]:
-                submit: Submit = Submit()
-                submit.stats = item
-                submit.task = task
+                submit: Submit = Submit(item, task)
                 submits.append(submit)
 
     # 提出日時でソート
     sorted_submits = sorted(submits, key=lambda x: x.stats.datetime, reverse=True)
     
     # 表のHTMLを作成
-    html_table = '<table class="table table-dark">'
-    html_table += "<thead><tr>"
-    html_table += "<th>提出日時</th>"
-    html_table += "<th>Task</th>"
-    html_table += "<th>train</th>"
-    html_table += "<th>valid</th>"
-    html_table += "<th>メモ</th>"
-    html_table += "<th>メッセージ</th>"
-    html_table += "</tr></thead>"
-    html_table += "<tbody>"
-
-    for submit in sorted_submits:
-        html_table += CreateSubmitTableRow(submit, True)
-
-    html_table += "</tbody>"
-    html_table += "</table>"
+    html_table, num_col = CreateRecordTable(sorted_submits, visible_invalid_data=True,
+                                            task_name=True, memo=True,
+                                            message=True, unlock_mode=UnlockMode.UnlockAll)
 
     return html_table
 
@@ -912,10 +854,16 @@ def board(task_id):
 
     # 日付順にソート
     sorted_stats_list = sorted(best_stats_every_user, key=lambda x: x.datetime, reverse=True)
+    submit_list = []
+    for stats in sorted_stats_list:
+        submit_list.append(Submit(stats, task))
     
     # test成績順にソート
     if len(best_stats_in_contest) > 0:
-        sorted_stats_list_in_contest = sorted(best_stats_in_contest, key=lambda x: x.test, reverse=True)
+        sorted_stats_list_in_contest = sorted(best_stats_in_contest, key=lambda x: x.test, reverse=True if task.metric == Task.Metric.Accuracy else False)
+        submit_list_in_contest = []
+        for stats in sorted_stats_list_in_contest:
+            submit_list_in_contest.append(Submit(stats, task))
  
     # unlock判定
     unlock = False
@@ -929,12 +877,15 @@ def board(task_id):
                 unlock = True
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
+    html_table, num_col = CreateRecordTable(submit_list, table_id='sortable-table', user_name=True,
+                                            test=True if task.type == Task.TaskType.Contest else False,
+                                            unlock_mode=UnlockMode.UnlockAchieveStats if unlock else UnlockMode.LockAll)
 
     # コンテスト終了時の成績表を作成
     html_contest_result = None
     if len(best_stats_in_contest) > 0:
-        html_contest_result, num_col = CreateBoardTable(sorted_stats_list_in_contest, task, unlock=unlock, test=True)
+        html_contest_result, num_col = CreateRecordTable(submit_list_in_contest, user_name=True, test=True,
+                                                         unlock_mode=UnlockMode.UnlockAchieveStats if unlock else UnlockMode.LockAll)
 
     return render_template('board.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
@@ -975,9 +926,14 @@ def log(task_id):
                     unlock = True
 
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
+    submit_list = []
+    for stats in sorted_stats_list:
+        submit_list.append(Submit(stats, task))
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task, unlock=unlock, test=True if task.type == Task.TaskType.Contest else False)
+    html_table, num_col = CreateRecordTable(submit_list, table_id='sortable-table', user_name=True,
+                                            test=True if task.type == Task.TaskType.Contest else False,
+                                            unlock_mode=UnlockMode.UnlockAchieveStats if unlock else UnlockMode.LockAll)
 
     return render_template('log.html',
                            task_name=task.dispname(SETTING["name"]["contest"]),
@@ -1067,9 +1023,14 @@ def admin(task_id):
         for item in stats:
             stats_list.append(item)
     sorted_stats_list = sorted(stats_list, key=lambda x: x.datetime, reverse=True)
+    submit_list = []
+    for stats in sorted_stats_list:
+        submit_list.append(Submit(stats, task))
 
     # 表を作成
-    html_table, num_col = CreateBoardTable(sorted_stats_list, task, test=True, message=True, unlock=True)
+    html_table, num_col = CreateRecordTable(submit_list, visible_invalid_data=True, table_id='sortable-table', user_name=True,
+                                            test=True if task.type == Task.TaskType.Contest else False,
+                                            message=True, unlock_mode=UnlockMode.UnlockAll)
 
     return render_template('log.html',
                            task_id=task_id,
