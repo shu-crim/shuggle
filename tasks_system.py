@@ -30,7 +30,7 @@ def UpdateTtimestamp(task_id):
         f.write(datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
 
 
-def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch):
+def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_data_type:Task.InputDataType=Task.InputDataType.Image3ch):
     json_open = open(path_json, 'r', encoding='utf-8')
     dataset = json.load(json_open)
 
@@ -42,7 +42,16 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, data_t
     for item in dataset["data"]:
         try:
             # 正解値
-            correct_list.append(answer_value_type(item["gt"]))
+            if answer_value_type == Task.AnswerValueType.Image1ch:
+                # 画像の読み込み(グレースケール)
+                correct_list.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), item["gt"])).convert("L")))
+            elif answer_value_type == Task.AnswerValueType.Image3ch:
+                # 画像の読み込み(カラー)
+                correct_list.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), item["gt"]))))
+            elif answer_value_type == Task.AnswerValueType.real:
+                correct_list.append(float(item["gt"]))
+            elif answer_value_type == Task.AnswerValueType.integer:
+                correct_list.append(int(item["gt"]))
 
             # 入力データ
             data = []
@@ -51,14 +60,24 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, data_t
                 for path in item["path"]:
                     # 画像読み込み
                     filename.append(path)
-                    data.append(np.array(Image.open(os.path.join(os.path.dirname(path_json), path))))
+                    image = Image.open(os.path.join(os.path.dirname(path_json), path))
+                    if input_data_type == "image-1ch":
+                        image = image.convert("L")
+                    data.append(np.array(image))
             else:
                 # 画像読み込み
                 filename = item["path"]
-                data = np.array(Image.open(os.path.join(os.path.dirname(path_json), item["path"])))
+                image = Image.open(os.path.join(os.path.dirname(path_json), item["path"]))
+                if input_data_type == "image-1ch":
+                    image = image.convert("L")
+                data = np.array(image)
 
-            input_data = np.array(data, dtype=data[0].dtype)
-            input_data_list.append(input_data)
+            # 複数データの場合にひとまとめの行列にする
+            if multi_data:
+                input_data_list.append(np.array(data, dtype=data[0].dtype))
+            else:
+                input_data_list.append(data)
+
             filename_list.append(filename)
 
             num_problem += 1
@@ -66,17 +85,17 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, data_t
             print(f"入力データ({num_problem})の読み込みに失敗しました。")
             continue
 
-    # 正解値リストをnumpyに変換
-    correct_list = np.array(correct_list, dtype=answer_value_type)
+    # 正解値リストをnumpyに変換→しないことに変更。
+    # correct_list = np.array(correct_list, dtype=answer_value_type)
 
     return num_problem, filename_list, input_data_list, correct_list
 
 
-def evaluate(num_problem, input_data_list, func_recognition, answer_value_type, timelimit_per_data=PROC_TIMEOUT_SEC):
+def evaluate(num_problem, input_data_list, func_recognition, answer_value_type:Task.AnswerValueType, timelimit_per_data=PROC_TIMEOUT_SEC):
     total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
-        answer_list = np.zeros((num_problem), answer_value_type)
+        answer_list = []
         with Pool(processes=1) as p:
             for i in range(num_problem):
                 num_input_data = input_data_list[i].shape[0]
@@ -87,21 +106,25 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type, 
                 answer = apply_result.get(timeout=time_limit)
 
                 # 返り値の型を矯正
-                answer = answer_value_type(answer)
-                if type(answer) is not answer_value_type:
-                    print(f"Type error answer:{type(answer)} answer_value_type:{answer_value_type}")
-                    raise(ValueError("推定処理の返り値の型が適切ではありません。"))
+                # answer = answer_value_type(answer)
+                if answer_value_type == Task.AnswerValueType.integer:
+                    answer = int(answer)
+                elif answer_value_type == Task.AnswerValueType.real:
+                    answer = float(answer)
+                elif answer_value_type == Task.AnswerValueType.Image1ch:
+                    answer = np.array(answer, dtype=np.uint8)
                 
                 end_time = time.time()
                 total_proc_time += end_time - start_time
                 #print(f'proc time: {end_time - start_time} s')
                 if end_time - start_time > time_limit:
-                    raise(TimeoutError("推定処理がタイムアウトしました。"))
+                    raise(TimeoutError("処理がタイムアウトしました。"))
 
-                answer_list[i] = answer
+                answer_list.append(answer)
+
     except TimeoutError:
-        print("推定処理がタイムアウトしました。")
-        raise(TimeoutError("推定処理がタイムアウトしました。"))
+        print("処理がタイムアウトしました。")
+        raise(TimeoutError("処理がタイムアウトしました。"))
     except Exception as e:
         raise(e)
     
@@ -121,7 +144,7 @@ class Result:
         self.answer = answer
     
 
-def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch, contest:bool=False, timelimit_per_data=PROC_TIMEOUT_SEC):
+def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.AnswerValueType, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch, contest:bool=False, timelimit_per_data=PROC_TIMEOUT_SEC):
     try:
         # ユーザ作成の処理を読み込む
         user_module = importlib.import_module(f"{Task.TASKS_DIR}.{task_id}.{Task.USER_MODULE_DIR_NAME}.{module_name}")
@@ -148,6 +171,11 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         if num_train == 0:
             return []
         for i in range(num_train):
+            # 画像の場合はサイズのチェック
+            if answer_value_type == Task.AnswerValueType.Image1ch or answer_value_type == Task.AnswerValueType.Image3ch:
+                if correct_list[i].shape != answer_list[i].shape:
+                    raise(ValueError("処理結果の値が適切ではありません。"))
+
             result = Result(Task.DataType.train, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
         print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, total: {total_proc_time : .1f} s')
@@ -168,6 +196,11 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
         if num_valid == 0:
             return []
         for i in range(num_valid):
+            # 画像の場合はサイズのチェック
+            if answer_value_type == Task.AnswerValueType.Image1ch or answer_value_type == Task.AnswerValueType.Image3ch:
+                if correct_list[i].shape != answer_list[i].shape:
+                    raise(ValueError("処理結果の値が適切ではありません。"))
+
             result = Result(Task.DataType.valid, filename_list[i], correct_list[i], answer_list[i])
             result_list.append(result)
         print(f'Valid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, total: {total_proc_time : .1f} s')
@@ -189,6 +222,11 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type=int, multi_
             if num_test == 0:
                 return []
             for i in range(num_test):
+                # 画像の場合はサイズのチェック
+                if answer_value_type == Task.AnswerValueType.Image1ch or answer_value_type == Task.AnswerValueType.Image3ch:
+                    if correct_list[i].shape != answer_list[i].shape:
+                        raise(ValueError("処理結果の値が適切ではありません。"))
+
                 result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i])
                 result_list.append(result)
             print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, total: {total_proc_time : .1f} s')
@@ -212,17 +250,17 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     proc_success = False
     message = ''
     try:
-        if task.answer_value_type == Task.AnswerValueType.integer:
-            answer_value_type = int
-        elif task.answer_value_type == Task.AnswerValueType.real:
-            answer_value_type = float
+        # if task.answer_value_type == Task.AnswerValueType.integer:
+        #     answer_value_type = int
+        # elif task.answer_value_type == Task.AnswerValueType.real:
+        #     answer_value_type = float
 
         result_list = evaluate3data(
             task_id, os.path.splitext(new_filename)[0], # 拡張子を除く
-            user_name, answer_value_type, task.multi_input_data,
+            user_name, task.answer_value_type, task.multi_input_data,
             task.input_data_type, True if task.type == Task.TaskType.Contest else False,
             task.timelimit_per_data)
-
+        
         proc_success = True
     except Exception as e:
         proc_success = False
@@ -248,7 +286,15 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
             for result in result_list:
                 if not result.data_type in abs_errors:
                     abs_errors[result.data_type] = []
-                abs_errors[result.data_type].append(np.abs(result.answer - result.correct))
+
+                if task.answer_value_type == Task.AnswerValueType.Image1ch or task.answer_value_type == Task.AnswerValueType.Image3ch:
+                    # 画素ごとの絶対誤差を画像全体で平均
+                    abs_error = np.average(np.abs(result.answer.astype(int) - result.correct.astype(int)))
+                else:
+                    # 値の絶対誤差
+                    abs_error = np.abs(result.answer - result.correct)
+
+                abs_errors[result.data_type].append(abs_error)
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
@@ -277,7 +323,17 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
             elif task.metric == Task.Metric.MAE:
                 output_csv_file.write("type,filename,correct,answer,abs_error\n")
                 for result in result_list:
-                    output_csv_file.write(f"{result.data_type.name},{str(result.filename).replace(',', '-')},{result.correct},{result.answer},{np.abs(result.answer - result.correct)}\n")
+                    if task.answer_value_type == Task.AnswerValueType.Image1ch or task.answer_value_type == Task.AnswerValueType.Image3ch:
+                        correct = "-"
+                        answer = "-"
+                        # 画素ごとの絶対誤差を画像全体で平均
+                        abs_error = np.average(np.abs(result.answer.astype(int) - result.correct.astype(int)))
+                    else:
+                        correct = result.correct
+                        answer = result.answer
+                        # 値の絶対誤差
+                        abs_error = np.abs(result.answer - result.correct)
+                    output_csv_file.write(f"{result.data_type.name},{str(result.filename).replace(',', '-')},{correct},{answer},{abs_error}\n")
 
     # ユーザ毎の結果出力
     csv_path = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", user_name + ".csv")
@@ -419,7 +475,7 @@ def main():
 
                     # ファイルの移動に成功したらプロセス生成して処理開始
                     proccess.submit(ProcOneUser, task_id, user_name, new_filename, now, memo)
-
+                    # ProcOneUser(task_id, user_name, new_filename, now, memo) # デバッグのため同期実行
 
             # 少し待つ
             time.sleep(1.0)

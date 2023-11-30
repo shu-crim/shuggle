@@ -22,6 +22,8 @@ class Task:
     class AnswerValueType(Enum):
         real = 1
         integer = 2
+        Image1ch = 3
+        Image3ch = 4
 
     class DataType(Enum):
         train = 1
@@ -112,6 +114,10 @@ class Task:
             return Task.AnswerValueType.integer
         elif answer_value_type == "real":
             return Task.AnswerValueType.real
+        elif answer_value_type == "image-1ch":
+            return Task.AnswerValueType.Image1ch
+        elif answer_value_type == "image-3ch":
+            return Task.AnswerValueType.Image3ch
         else:
             raise(ValueError("無効なanswer_value_type指定です。"))
 
