@@ -509,6 +509,7 @@ class Log:
         html_table += "<tbody>"
 
         paths = glob.glob(os.path.join(Log.LOG_DIR, "*.log"))
+        paths = sorted(paths)
         for path in paths:
             lines = []
             try:
