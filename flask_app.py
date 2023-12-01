@@ -791,6 +791,11 @@ def get_taskcard(task_id):
     return send_from_directory(os.path.join(Task.TASKS_DIR, task_id), "card.png")
 
 
+@app.route('/<task_id>/resource/<filename>')
+def get_task_image(task_id, filename):
+    return send_from_directory(os.path.join(Task.TASKS_DIR, task_id, Task.RESOURCE_DIR_NAME), filename)
+
+
 @app.route("/<task_id>/task")
 def task(task_id):
     if not task_id in TASK:
@@ -804,7 +809,7 @@ def task(task_id):
 
     return render_template(f'tasks/{task_id}/index.html',
                            menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin, user_name=user_data.name if verified else ''),
-                           task_name=task.dispname(SETTING["name"]["contest"]),
+                           task_name=task.dispname(SETTING["name"]["contest"]), task_id=task_id,
                            goal=Task.goalText(task.metric, task.goal))
 
 

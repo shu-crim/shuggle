@@ -18,6 +18,7 @@ class Task:
     UPLOAD_DIR_NAME = r"upload"
     USER_MODULE_DIR_NAME = r"user_module"
     TIMESTAMP_FILE_NAME = r"timestamp.txt"
+    RESOURCE_DIR_NAME = r"resource"
 
     class AnswerValueType(Enum):
         real = 1
