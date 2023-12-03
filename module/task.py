@@ -43,6 +43,9 @@ class Task:
         Quest = 1
         Contest = 2
 
+    class ParameterType(Enum):
+        real = 1
+        integer = 2
 
     id: str
     name: str

@@ -36,9 +36,21 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_
 
     filename_list = []
     input_data_list = [] #入力データ
+    parameter_list = [] #パラメータ
     correct_list = [] #正解値
     num_problem = 0
+    parameter_type = []
 
+    # パラメータ型の読み込み
+    if "parameter_type" in dataset:
+        types = dataset["parameter_type"]
+        for t in types:
+            if t == "real":
+                parameter_type.append(Task.ParameterType.real)
+            elif t == "integer":
+                parameter_type.append(Task.ParameterType.integer)
+
+    # データの読み込み
     for item in dataset["data"]:
         try:
             # 正解値
@@ -78,6 +90,18 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_
             else:
                 input_data_list.append(data)
 
+            # パラメータ
+            param_list = []
+            if "parameter" in item:
+                params = item["parameter"]
+                for index in range(len(parameter_type)):
+                    if parameter_type[index] == Task.ParameterType.real:
+                        param_list.append(float(params[index]))
+                    if parameter_type[index] == Task.ParameterType.integer:
+                        param_list.append(int(params[index]))
+            parameter_list.append(param_list)
+
+            # ファイル名を追加
             filename_list.append(filename)
 
             num_problem += 1
@@ -88,10 +112,10 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_
     # 正解値リストをnumpyに変換→しないことに変更。
     # correct_list = np.array(correct_list, dtype=answer_value_type)
 
-    return num_problem, filename_list, input_data_list, correct_list
+    return num_problem, filename_list, input_data_list, parameter_list, correct_list
 
 
-def evaluate(num_problem, input_data_list, func_recognition, answer_value_type:Task.AnswerValueType, timelimit_per_data=PROC_TIMEOUT_SEC):
+def evaluate(num_problem, input_data_list, parameter_list, func_recognition, answer_value_type:Task.AnswerValueType, timelimit_per_data=PROC_TIMEOUT_SEC):
     total_proc_time = 0
     try:
         # ユーザ作成の処理にかける
@@ -102,7 +126,15 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type:T
                 time_limit = timelimit_per_data * (num_input_data + 20) if i == 0 else timelimit_per_data * num_input_data # 初回のみオーバーヘッドを考慮してゆるめ
 
                 start_time = time.time()
-                apply_result = p.apply_async(func_recognition, (input_data_list[i],))
+
+                if len(parameter_list[i]) == 0:
+                    apply_result = p.apply_async(func_recognition, (input_data_list[i],))
+                elif len(parameter_list[i]) == 1:
+                    apply_result = p.apply_async(func_recognition, (input_data_list[i], parameter_list[i][0],))
+                else:
+                    apply_result = p.apply_async(func_recognition, (input_data_list[i], parameter_list[i],))
+
+                # apply_result = p.apply_async(func_recognition, (input_data_list[i],))
                 answer = apply_result.get(timeout=time_limit)
 
                 # 返り値の型を矯正
@@ -112,6 +144,8 @@ def evaluate(num_problem, input_data_list, func_recognition, answer_value_type:T
                 elif answer_value_type == Task.AnswerValueType.real:
                     answer = float(answer)
                 elif answer_value_type == Task.AnswerValueType.Image1ch:
+                    answer = np.array(answer, dtype=np.uint8)
+                elif answer_value_type == Task.AnswerValueType.Image3ch:
                     answer = np.array(answer, dtype=np.uint8)
                 
                 end_time = time.time()
@@ -164,10 +198,10 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
 
     try:    
         # train
-        num_train, filename_list, input_data_list, correct_list = read_dataset(
+        num_train, filename_list, input_data_list, parameter_list, correct_list = read_dataset(
             os.path.join(Task.TASKS_DIR, task_id, "train", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
 
-        answer_list, total_proc_time = evaluate(num_train, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
+        answer_list, total_proc_time = evaluate(num_train, input_data_list, parameter_list, func_recognition, answer_value_type, timelimit_per_data)
         if num_train == 0:
             return []
         for i in range(num_train):
@@ -181,18 +215,20 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
         print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, total: {total_proc_time : .1f} s')
 
         # valid
-        num_valid, filename_list, input_data_list, correct_list = read_dataset(
+        num_valid, filename_list, input_data_list, parameter_list, correct_list = read_dataset(
             os.path.join(Task.TASKS_DIR, task_id, "valid", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
         # シャッフル
         rng = np.random.default_rng(int(start))
         rng.shuffle(input_data_list)
         rng = np.random.default_rng(int(start))
+        rng.shuffle(parameter_list)
+        rng = np.random.default_rng(int(start))
         rng.shuffle(correct_list)
         rng = np.random.default_rng(int(start))
         rng.shuffle(filename_list)
 
-        answer_list, total_proc_time = evaluate(num_valid, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
+        answer_list, total_proc_time = evaluate(num_valid, input_data_list, parameter_list, func_recognition, answer_value_type, timelimit_per_data)
         if num_valid == 0:
             return []
         for i in range(num_valid):
@@ -207,18 +243,20 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
 
         # test
         if contest:
-            num_test, filename_list, input_data_list, correct_list = read_dataset(
+            num_test, filename_list, input_data_list, parameter_list, correct_list = read_dataset(
                 os.path.join(Task.TASKS_DIR, task_id, "test", FILENAME_DATASET_JSON), answer_value_type, multi_data, data_type)
         
             # シャッフル
             rng = np.random.default_rng(int(start))
             rng.shuffle(input_data_list)
             rng = np.random.default_rng(int(start))
+            rng.shuffle(parameter_list)
+            rng = np.random.default_rng(int(start))
             rng.shuffle(correct_list)
             rng = np.random.default_rng(int(start))
             rng.shuffle(filename_list)
 
-            answer_list, total_proc_time = evaluate(num_test, input_data_list, func_recognition, answer_value_type, timelimit_per_data)
+            answer_list, total_proc_time = evaluate(num_test, input_data_list, parameter_list, func_recognition, answer_value_type, timelimit_per_data)
             if num_test == 0:
                 return []
             for i in range(num_test):
@@ -250,11 +288,6 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
     proc_success = False
     message = ''
     try:
-        # if task.answer_value_type == Task.AnswerValueType.integer:
-        #     answer_value_type = int
-        # elif task.answer_value_type == Task.AnswerValueType.real:
-        #     answer_value_type = float
-
         result_list = evaluate3data(
             task_id, os.path.splitext(new_filename)[0], # 拡張子を除く
             user_name, task.answer_value_type, task.multi_input_data,
@@ -352,7 +385,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
 
     with open(csv_path, "a", encoding='utf-8') as output_csv_file:
         output_csv_file.write('\n') # 各結果の最初に改行を入れる。前の不正終了を引きずらないため
-        output_csv_file.write(now.strftime('%Y/%m/%d,%H:%M:%S,'))                    
+        output_csv_file.write(now.strftime('%Y/%m/%d,%H:%M:%S,'))
         output_csv_file.write(os.path.basename(new_filename) + ",")
         for data_type in Task.DataType:
             if task.metric == Task.Metric.Accuracy:
@@ -403,7 +436,7 @@ def main():
         while True:
             # ディレクトリの一覧を作成して走査
             dir_list_tasks = glob.glob(os.path.join(Task.TASKS_DIR, '**/'))
-            for dir_task in dir_list_tasks:                    
+            for dir_task in dir_list_tasks:
                 # ディレクトリ名を取得→タスクIDとして使う
                 task_id = os.path.basename(os.path.dirname(dir_task))
 
@@ -474,8 +507,8 @@ def main():
                     Log.write(f'{user_name} submit {new_filename} to {task_id}, file movement succeeded, then the proccess started.')
 
                     # ファイルの移動に成功したらプロセス生成して処理開始
-                    proccess.submit(ProcOneUser, task_id, user_name, new_filename, now, memo)
-                    # ProcOneUser(task_id, user_name, new_filename, now, memo) # デバッグのため同期実行
+                    # proccess.submit(ProcOneUser, task_id, user_name, new_filename, now, memo)
+                    ProcOneUser(task_id, user_name, new_filename, now, memo) # デバッグのため同期実行
 
             # 少し待つ
             time.sleep(1.0)
