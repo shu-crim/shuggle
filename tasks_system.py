@@ -73,14 +73,14 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_
                     # 画像読み込み
                     filename.append(path)
                     image = Image.open(os.path.join(os.path.dirname(path_json), path))
-                    if input_data_type == "image-1ch":
+                    if input_data_type == Task.InputDataType.Image1ch:
                         image = image.convert("L")
                     data.append(np.array(image))
             else:
                 # 画像読み込み
                 filename = item["path"]
                 image = Image.open(os.path.join(os.path.dirname(path_json), item["path"]))
-                if input_data_type == "image-1ch":
+                if input_data_type == Task.InputDataType.Image1ch:
                     image = image.convert("L")
                 data = np.array(image)
 
