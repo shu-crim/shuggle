@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response, Markup, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, make_response, send_from_directory, send_file
+from markupsafe import Markup
 from flask_httpauth import HTTPBasicAuth, HTTPDigestAuth
 from werkzeug.utils import secure_filename
 import json
@@ -240,6 +241,36 @@ def CreateRecordTableRow(submit:Submit, visible_invalid_data:bool=False, user_na
                             # Questであればいつでも、Contestであれば期間終了後にロック解除
                             if submit.task.afterContest(): 
                                 html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test:.3f}(MAE)</td>'
+                                unlock = True
+                        if not unlock:
+                            html_temp += f'<td>?</td>'
+
+        elif submit.task.metric == Task.Metric.RegistrationRate:
+            # Goal:選択
+            if goal:
+                html_temp += f'<td>データ登録率 <span style="color:#0dcaf0">{submit.task.goal*100:.1f}%</span> 以下 {submit.task.achieveStarHTML(submit.stats)}</td>'
+
+            # invalid判定
+            if submit.stats.train < 0:
+                if visible_invalid_data:
+                    html_temp += '<td>-</td><td>-</td>' if not test else '<td>-</td><td>-</td><td>-</td>'
+                else:
+                    return ""
+                
+            else:
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train*100:.1f}%(登録率)</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid*100:.1f}%(登録率)</td>'
+                
+                # Test:選択
+                if test:
+                    if submit.task.type == Task.TaskType.Quest:
+                        html_temp += '<td>-</td>'
+                    elif submit.task.type == Task.TaskType.Contest:
+                        unlock = False
+                        if submit.task.achieve(submit.stats):
+                            # Questであればいつでも、Contestであれば期間終了後にロック解除
+                            if submit.task.afterContest(): 
+                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test*100:.1f}(登録率)</td>'
                                 unlock = True
                         if not unlock:
                             html_temp += f'<td>?</td>'

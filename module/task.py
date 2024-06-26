@@ -4,7 +4,7 @@ import datetime
 from enum import Enum
 import json
 from functools import cmp_to_key
-from flask import Markup
+from markupsafe import Markup
 import glob
 import shutil
 
@@ -25,6 +25,7 @@ class Task:
         integer = 2
         Image1ch = 3
         Image3ch = 4
+        ActiveLearing = 5
 
     class DataType(Enum):
         train = 1
@@ -34,10 +35,12 @@ class Task:
     class Metric(Enum):
         Accuracy = 1
         MAE = 2
+        RegistrationRate = 3
 
     class InputDataType(Enum):
         Image1ch = 1
         Image3ch = 2
+        Vector = 3
 
     class TaskType(Enum):
         Quest = 1
@@ -122,6 +125,10 @@ class Task:
             return Task.AnswerValueType.Image1ch
         elif answer_value_type == "image-3ch":
             return Task.AnswerValueType.Image3ch
+        elif answer_value_type == "integer-list":
+            return Task.AnswerValueType.IntegerList
+        elif answer_value_type == "ActiveLearing":
+            return Task.AnswerValueType.ActiveLearing
         else:
             raise(ValueError("無効なanswer_value_type指定です。"))
 
@@ -131,6 +138,8 @@ class Task:
             return Task.Metric.Accuracy
         elif metric == "MAE":
             return Task.Metric.MAE
+        elif metric == "RegistrationRate":
+            return Task.Metric.RegistrationRate
         else:
             raise(ValueError("無効なmetric指定です。"))
 
@@ -140,6 +149,8 @@ class Task:
             return Task.InputDataType.Image1ch
         elif input_data_type == "image-3ch":
             return Task.InputDataType.Image3ch
+        elif input_data_type == "vector":
+            return Task.InputDataType.Vector
         else:
             raise(ValueError("無効なinput_data_type指定です。"))
 
@@ -149,6 +160,8 @@ class Task:
             goal_text = f'正解率 <span style="color:#0dcaf0">{goal*100:.1f}</span> % 以上'
         elif metric == Task.Metric.MAE:
             goal_text = f'平均絶対誤差 <span style="color:#0dcaf0">{goal}</span> 以下'
+        elif metric == Task.Metric.RegistrationRate:
+            goal_text = f'データ登録率 <span style="color:#0dcaf0">{goal*100}%</span> 以下'
         return Markup(goal_text)
 
     def afterContest(self):
@@ -215,6 +228,10 @@ class Task:
             if stats.train > self.goal or stats.valid > self.goal or (self.type == Task.TaskType.Contest and stats.test > self.goal):
                 achieve = False
 
+        elif self.metric == Task.Metric.RegistrationRate:
+            if stats.train > self.goal or stats.valid > self.goal or (self.type == Task.TaskType.Contest and stats.test > self.goal):
+                achieve = False
+
         return achieve
 
 
@@ -236,6 +253,9 @@ class Task:
             if evaluated_value >= goal:
                 achieve = True
         elif metric == Task.Metric.MAE:
+            if evaluated_value <= goal:
+                achieve = True
+        elif metric == Task.Metric.RegistrationRate:
             if evaluated_value <= goal:
                 achieve = True
 
@@ -298,7 +318,7 @@ class Stats:
             except:
                 self.memo = ''
 
-        elif metric == Task.Metric.MAE:
+        elif metric == Task.Metric.MAE or metric == Task.Metric.RegistrationRate:
             try:
                 self.train = float(raw[3])
             except:
@@ -340,8 +360,8 @@ class Stats:
             else:
                 test = False
 
-            if a.metric == Task.Metric.MAE:
-                # 高い方がよい値となるよう反転させる
+            if a.metric == Task.Metric.MAE or a.metric == Task.Metric.RegistrationRate:
+                # 低い方がよい値となるよう反転させる
                 goal *= -1
                 train_a *= -1
                 train_b *= -1
@@ -409,8 +429,8 @@ class Stats:
             valid_a = a.valid
             valid_b = b.valid
 
-            if a.metric == Task.Metric.MAE:
-                # 高い方がよい値となるよう反転させる
+            if a.metric == Task.Metric.MAE or a.metric == Task.Metric.RegistrationRate:
+                # 低い方がよい値となるよう反転させる
                 goal *= -1
                 train_a *= -1
                 train_b *= -1

@@ -15,6 +15,8 @@ import json
 from module.task import Task, Log
 import chardet
 import random
+import cv2
+import sklearn.metrics
 
 
 FILENAME_DATASET_JSON = r"dataset.json"
@@ -64,25 +66,36 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_
                 correct_list.append(float(item["gt"]))
             elif answer_value_type == Task.AnswerValueType.integer:
                 correct_list.append(int(item["gt"]))
+            elif answer_value_type == Task.AnswerValueType.ActiveLearing:
+                correct_list.append(item["gt"])
 
             # 入力データ
             data = []
             filename = []
-            if multi_data:
-                for path in item["path"]:
+            if input_data_type == Task.InputDataType.Vector:
+                # ベクトル
+                data = np.array(item["vector"], np.float32)
+                if "path" in item:
+                    filename = item["path"]
+                else:
+                    filename = ["" for i in range(len(data))]
+            else:
+                # 画像
+                if multi_data:
+                    for path in item["path"]:
+                        # 画像読み込み
+                        filename.append(path)
+                        image = Image.open(os.path.join(os.path.dirname(path_json), path))
+                        if input_data_type == Task.InputDataType.Image1ch:
+                            image = image.convert("L")
+                        data.append(np.array(image))
+                else:
                     # 画像読み込み
-                    filename.append(path)
-                    image = Image.open(os.path.join(os.path.dirname(path_json), path))
+                    filename = item["path"]
+                    image = Image.open(os.path.join(os.path.dirname(path_json), item["path"]))
                     if input_data_type == Task.InputDataType.Image1ch:
                         image = image.convert("L")
-                    data.append(np.array(image))
-            else:
-                # 画像読み込み
-                filename = item["path"]
-                image = Image.open(os.path.join(os.path.dirname(path_json), item["path"]))
-                if input_data_type == Task.InputDataType.Image1ch:
-                    image = image.convert("L")
-                data = np.array(image)
+                    data = np.array(image)
 
             # 複数データの場合にひとまとめの行列にする
             if multi_data:
@@ -90,27 +103,40 @@ def read_dataset(path_json, answer_value_type=int, multi_data:bool=False, input_
             else:
                 input_data_list.append(data)
 
-            # パラメータ
-            param_list = []
-            if "parameter" in item:
-                params = item["parameter"]
-                for index in range(len(parameter_type)):
-                    if parameter_type[index] == Task.ParameterType.real:
-                        param_list.append(float(params[index]))
-                    if parameter_type[index] == Task.ParameterType.integer:
-                        param_list.append(int(params[index]))
-            parameter_list.append(param_list)
+            # Active learing Taskの場合、学習データをパラメータとして読み込む
+            if answer_value_type == Task.AnswerValueType.ActiveLearing:
+                parameter = [[], [], 0] #[入力データのリスト, ラベルのリスト, P/R目標値]
+                if input_data_type == Task.InputDataType.Vector:
+                    # ベクトル読み込み
+                    parameter[0] = np.array(item["train"], np.float32)
+                else:
+                    raise(ValueError(f"answer_value_typeの指定({answer_value_type})が不正です。"))
+                
+                # ラベルと目標値の読み込み
+                parameter[1] += item["train-gt"]
+                parameter[2] = item["goal"]
+
+                # データ追加
+                parameter_list.append(parameter)
+            else:
+                # 通常のパラメータ読み込み
+                param_list = []
+                if "parameter" in item:
+                    params = item["parameter"]
+                    for index in range(len(parameter_type)):
+                        if parameter_type[index] == Task.ParameterType.real:
+                            param_list.append(float(params[index]))
+                        if parameter_type[index] == Task.ParameterType.integer:
+                            param_list.append(int(params[index]))
+                parameter_list.append(param_list)
 
             # ファイル名を追加
             filename_list.append(filename)
 
             num_problem += 1
-        except:
-            print(f"入力データ({num_problem})の読み込みに失敗しました。")
+        except Exception as e:
+            print(f"入力データ({num_problem})の読み込みに失敗しました： {e}")
             continue
-
-    # 正解値リストをnumpyに変換→しないことに変更。
-    # correct_list = np.array(correct_list, dtype=answer_value_type)
 
     return num_problem, filename_list, input_data_list, parameter_list, correct_list
 
@@ -131,6 +157,10 @@ def evaluate(num_problem, input_data_list, parameter_list, func_recognition, ans
                     apply_result = p.apply_async(func_recognition, (input_data_list[i],))
                 elif len(parameter_list[i]) == 1:
                     apply_result = p.apply_async(func_recognition, (input_data_list[i], parameter_list[i][0],))
+                elif len(parameter_list[i]) == 2:
+                    apply_result = p.apply_async(func_recognition, (input_data_list[i], parameter_list[i][0], parameter_list[i][1],))
+                elif len(parameter_list[i]) == 3:
+                    apply_result = p.apply_async(func_recognition, (input_data_list[i], parameter_list[i][0], parameter_list[i][1], parameter_list[i][2],))
                 else:
                     apply_result = p.apply_async(func_recognition, (input_data_list[i], parameter_list[i],))
 
@@ -147,6 +177,8 @@ def evaluate(num_problem, input_data_list, parameter_list, func_recognition, ans
                     answer = np.array(answer, dtype=np.uint8)
                 elif answer_value_type == Task.AnswerValueType.Image3ch:
                     answer = np.array(answer, dtype=np.uint8)
+                elif answer_value_type == Task.AnswerValueType.ActiveLearing:
+                    answer = np.array(answer, dtype=int)
                 
                 end_time = time.time()
                 total_proc_time += end_time - start_time
@@ -170,12 +202,16 @@ class Result:
     filename = ""
     correct = 0
     answer = 0
+    inputdata = None
+    parameter = None
 
-    def __init__(self, data_type, filename, correct, answer) -> None:
+    def __init__(self, data_type, filename, correct, answer, inputdata, parameter) -> None:
         self.data_type = data_type
         self.filename = filename
         self.correct = correct
         self.answer = answer
+        self.inputdata = inputdata
+        self.parameter = parameter
     
 
 def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.AnswerValueType, multi_data:bool=False, data_type:Task.InputDataType=Task.InputDataType.Image3ch, contest:bool=False, timelimit_per_data=PROC_TIMEOUT_SEC):
@@ -210,7 +246,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
                 if correct_list[i].shape != answer_list[i].shape:
                     raise(ValueError("処理結果の値が適切ではありません。"))
 
-            result = Result(Task.DataType.train, filename_list[i], correct_list[i], answer_list[i])
+            result = Result(Task.DataType.train, filename_list[i], correct_list[i], answer_list[i], input_data_list[i], parameter_list[i])
             result_list.append(result)
         print(f'Train({user_name}) average proc time: {total_proc_time / num_train : .1f}s, total: {total_proc_time : .1f} s')
 
@@ -237,7 +273,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
                 if correct_list[i].shape != answer_list[i].shape:
                     raise(ValueError("処理結果の値が適切ではありません。"))
 
-            result = Result(Task.DataType.valid, filename_list[i], correct_list[i], answer_list[i])
+            result = Result(Task.DataType.valid, filename_list[i], correct_list[i], answer_list[i], input_data_list[i], parameter_list[i])
             result_list.append(result)
         print(f'Valid({user_name}) average proc time: {total_proc_time / num_valid : .1f}s, total: {total_proc_time : .1f} s')
 
@@ -265,7 +301,7 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
                     if correct_list[i].shape != answer_list[i].shape:
                         raise(ValueError("処理結果の値が適切ではありません。"))
 
-                result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i])
+                result = Result(Task.DataType.test, filename_list[i], correct_list[i], answer_list[i], input_data_list[i], parameter_list[i])
                 result_list.append(result)
             print(f'Test({user_name}) average proc time: {total_proc_time / num_test : .1f}s, total: {total_proc_time : .1f} s')
 
@@ -275,6 +311,61 @@ def evaluate3data(task_id, module_name, user_name, answer_value_type:Task.Answer
     print(f'Proc Time({user_name}): {time.time()-start : .1f} s')
 
     return result_list
+
+
+def caclActiveLearingAccuracy(label_gt, label_estimation, num_class):
+    precision = sklearn.metrics.precision_score(label_gt, label_estimation, average=None, labels=[i for i in range(num_class)], zero_division=1)
+    recall = sklearn.metrics.recall_score(label_gt, label_estimation, average=None, labels=[i for i in range(num_class)], zero_division=1)
+
+    return precision, recall
+
+
+def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, valid_data:list, label_valid:list, registration_order:list, goal:float) -> float:
+    num_registration_per_valid = 5 #5データずつ登録して評価
+    num_valid_data = len(registration_order)
+    train_data = np.array(train_data)
+    valid_data = np.array(valid_data)
+    label_train = np.array(label_train)
+    label_valid = np.array(label_valid)
+    K = 1
+
+    # 評価と登録のループ
+    for iValidObject in range(len(registration_order) + 1):
+        if iValidObject % num_registration_per_valid == 0 or iValidObject == num_valid_data:
+            if len(label_train) > 0:
+                # Trainデータの登録
+                knn = cv2.ml.KNearest_create()
+                knn.train(train_data, cv2.ml.ROW_SAMPLE, label_train)
+
+                # Validデータの識別
+                ret, results, neighbours, dist = knn.findNearest(valid_data, K)
+                label_estimation = results.reshape(label_valid.shape[0]).astype(int)
+            else:
+                # Validデータの識別結果はすべてclass0
+                label_estimation = np.zeros((label_valid.shape[0]), int)
+
+            precision, recall = caclActiveLearingAccuracy(label_valid, label_estimation, num_class)
+            np.set_printoptions(precision=2)
+            print(f"precision:", precision)
+            print(f"recall:", recall)
+
+            if min(precision) >= goal and min(recall) >= goal:
+                print(f"P/R Goal have been achieved!: {iValidObject} / {num_valid_data}")
+                registration_rate = iValidObject / num_valid_data
+                break
+
+        # trainデータの追加
+        if iValidObject < num_valid_data:
+            # リストから順に選択
+            addition_index = registration_order[iValidObject]
+
+            # Trainデータに追加
+            additional_data = valid_data[addition_index]
+            train_data = np.concatenate([train_data, [additional_data]])
+            label_train = np.concatenate([label_train, [label_valid[addition_index]]])
+            print(f"{iValidObject}:valid data[{addition_index}] was added.")
+
+    return registration_rate
 
 
 def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
@@ -328,6 +419,17 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                     abs_error = np.abs(result.answer - result.correct)
 
                 abs_errors[result.data_type].append(abs_error)
+        elif task.metric == Task.Metric.RegistrationRate:
+            registration_rate = {}
+            for data_type in Task.DataType:
+                registration_rate[data_type] = []
+
+            for result in result_list:
+                train_data, label_train, goal = result.parameter
+                num_class = max(label_train) + 1
+                registration_rate[result.data_type].append(
+                    evaluateActiveLearing(num_class, train_data, label_train, result.inputdata, result.correct, result.answer, goal)
+                )
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
@@ -335,7 +437,7 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
             # 集計
             output_csv_file.write(f"filename,{os.path.basename(new_filename)}\n\n")
             output_csv_file.write("type,num_data,{0}\n".format(
-                    "true,false,accuracy" if task.metric == Task.Metric.Accuracy else ("MAE" if task.metric == Task.Metric.MAE else "")
+                    "true,false,accuracy" if task.metric == Task.Metric.Accuracy else ("MAE" if task.metric == Task.Metric.MAE else ("RegistrationRate" if task.metric == Task.Metric.RegistrationRate else ""))
                 ))
             for data_type in Task.DataType:
                 if task.metric == Task.Metric.Accuracy:
@@ -346,6 +448,9 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                     if data_type in abs_errors:
                         num_data = len(abs_errors[data_type])
                         output_csv_file.write(f"{data_type.name},{num_data},{np.average(np.array(abs_errors[data_type], float))}\n")
+                elif task.metric == Task.Metric.RegistrationRate:
+                    num_data = len(registration_rate[data_type])
+                    output_csv_file.write(f"{data_type.name},{num_data},{np.average(np.array(registration_rate[data_type], float))}\n")
 
             # 詳細
             output_csv_file.write("\n")
@@ -367,6 +472,14 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                         # 値の絶対誤差
                         abs_error = np.abs(result.answer - result.correct)
                     output_csv_file.write(f"{result.data_type.name},{str(result.filename).replace(',', '-')},{correct},{answer},{abs_error}\n")
+            elif task.metric == Task.Metric.RegistrationRate:
+                num_data = {}
+                for data_type in Task.DataType:
+                    num_data[data_type] = 0
+                output_csv_file.write("type,index,RegistrationRate\n")
+                for result in result_list:
+                    output_csv_file.write(f"{result.data_type.name},{num_data[result.data_type]},{registration_rate[result.data_type][num_data[result.data_type]]}\n")
+                    num_data[result.data_type] += 1
 
     # ユーザ毎の結果出力
     csv_path = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", user_name + ".csv")
@@ -380,6 +493,8 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                     output_csv_file.write(f"{data_type.name}_true,{data_type.name}_false,{data_type.name}_accuracy,")
                 elif task.metric == Task.Metric.MAE:
                     output_csv_file.write(f"{data_type.name}_MAE,")
+                elif task.metric == Task.Metric.RegistrationRate:
+                    output_csv_file.write(f"{data_type.name}RegistrationRate,")
 
             output_csv_file.write("message,memo")
 
@@ -405,6 +520,14 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                             output_csv_file.write(f"{np.average(np.array(abs_errors[data_type], float))},")
                         else:
                             output_csv_file.write("-,")
+                    else:
+                        output_csv_file.write("-,")
+                else:
+                    output_csv_file.write("-,")
+            elif task.metric == Task.Metric.RegistrationRate:
+                if proc_success:
+                    if data_type in registration_rate:
+                        output_csv_file.write(f"{np.average(np.array(registration_rate[data_type], float))},")
                     else:
                         output_csv_file.write("-,")
                 else:
