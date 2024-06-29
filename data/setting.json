@@ -3,6 +3,7 @@
         "email": "hoge@hoge.hoge"
     },
     "name": {
-        "contest": "コンテスト"
+        "contest": "コンテスト",
+        "service": "IR Tasks"
     }
 }

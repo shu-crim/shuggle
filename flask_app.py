@@ -550,7 +550,8 @@ def index():
             if admin:
                 task_list_prepare.append(info)
     
-    return render_template('index.html', task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"],
+    return render_template('index.html',
+                           service_name=SETTING["name"]["service"],task_list_open=task_list_open, task_list_closed=task_list_closed, task_list_quest=task_list_quest, task_list_prepare=task_list_prepare, name_contest=SETTING["name"]["contest"],
                            menu=menuHTML(Page.HOME, url_from="/", user_name=user_data.name if verified else ''), admin=admin)
 
 
@@ -566,7 +567,8 @@ def join():
         from_url = "/"
 
     if request.method == 'GET':
-        return render_template(f'join.html', from_url=from_url, message="")
+        return render_template(f'join.html',
+                               service_name=SETTING["name"]["service"], from_url=from_url, message="")
     
     elif request.method == 'POST':
         try:
@@ -575,11 +577,11 @@ def join():
             password_verify = request.form['inputPasswordVerify']
             next_url = request.form['nextUrl']
         except:
-            return render_template(f'join.html', from_url=from_url, message="入力データを受け取れませんでした。")
+            return render_template(f'join.html', service_name=SETTING["name"]["service"], from_url=from_url, message="入力データを受け取れませんでした。")
         
         # 2つのパスワード入力の一致チェック
         if password != password_verify:
-            return render_template(f'join.html', from_url=from_url, message="再入力したパスワードが一致していません。")
+            return render_template(f'join.html', service_name=SETTING["name"]["service"], from_url=from_url, message="再入力したパスワードが一致していません。")
         
         # ユーザ情報を読み込む
         users = User.readUsersCsv(User.USER_CSV_PATH)
@@ -592,7 +594,7 @@ def join():
                 break
         if duplicate:
             Log.write(f"Failed to create account. the email already exist. email: {email}")
-            return render_template(f'join.html', from_url=from_url, message="そのEmail addressは既に登録されています。")
+            return render_template(f'join.html', service_name=SETTING["name"]["service"], from_url=from_url, message="そのEmail addressは既に登録されています。")
         
         # ID発行
         user_id = ""
@@ -606,7 +608,7 @@ def join():
 
         if user_id == "":
             Log.write(f"Failed to create ID. email: {email}")
-            return render_template(f'join.html', from_url=from_url, message="IDを発行できませんでした。")
+            return render_template(f'join.html', service_name=SETTING["name"]["service"], from_url=from_url, message="IDを発行できませんでした。")
         
         # パスワードをハッシュ化
         pass_hash = generate_password_hash(password, salt_length=21)
@@ -620,11 +622,11 @@ def join():
 
         if not success:
             Log.write(f"Failed to create account. addUsersCsv() error. email: {email}")
-            return render_template(f'join.html', from_url=from_url, message="ユーザ情報を登録できませんでした。")
+            return render_template(f'join.html', service_name=SETTING["name"]["service"], from_url=from_url, message="ユーザ情報を登録できませんでした。")
 
         Log.write(f"Success to create account. email: {email}")
 
-        return render_template(f'user.html', from_url=from_url, user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
+        return render_template(f'user.html', service_name=SETTING["name"]["service"], from_url=from_url, user_email=email, user_id=user_id, user_key=user_key, user_name=name, next_url=next_url, login="true", update_user_data="true")
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -634,7 +636,7 @@ def login():
         from_url = "/"
 
     if request.method == 'GET':
-        return render_template(f'login.html', from_url=from_url, message="", email_admin=SETTING["admin"]["email"])
+        return render_template(f'login.html', service_name=SETTING["name"]["service"], from_url=from_url, message="", email_admin=SETTING["admin"]["email"])
     
     elif request.method == 'POST':
         try:
@@ -642,13 +644,13 @@ def login():
             password = request.form['inputPassword']
             next_url = request.form['nextUrl']
         except:
-            return render_template(f'login.html', from_url=from_url, message="入力データを受け取れませんでした。", email_admin=SETTING["admin"]["email"])
+            return render_template(f'login.html', service_name=SETTING["name"]["service"], from_url=from_url, message="入力データを受け取れませんでした。", email_admin=SETTING["admin"]["email"])
         
         # emailとパスワードで照合
         verified, user_data = VerifyEmailAndPassword(email, password)
         if not verified:
             Log.write(f"Failed to log in. email: {email}")
-            return render_template(f'login.html', from_url=from_url, message="Email addressかPasswordが誤っています。", email_admin=SETTING["admin"]["email"])
+            return render_template(f'login.html', service_name=SETTING["name"]["service"], from_url=from_url, message="Email addressかPasswordが誤っています。", email_admin=SETTING["admin"]["email"])
 
         Log.write(f"Success to log in. email: {email}")
 
@@ -660,7 +662,7 @@ def login():
 
         # ユーザ情報をクッキーに書き込み
         response = make_response(
-            render_template(f'user.html', from_url=from_url, user_email=email, user_id=user_data.id, user_key=user_key, user_name=user_data.name, next_url=next_url, login="true", update_user_data="true")
+            render_template(f'user.html', service_name=SETTING["name"]["service"], from_url=from_url, user_email=email, user_id=user_data.id, user_key=user_key, user_name=user_data.name, next_url=next_url, login="true", update_user_data="true")
         )
         user_info = {'id':user_data.id, 'key':user_key}
         expires = int(datetime.datetime.now().timestamp()) + COOKIE_AGE_SEC
@@ -701,7 +703,7 @@ def user():
     if request.method == 'GET':
         from_url = request.args.get('from')
         return render_template(
-            f'user.html', login="false",
+            f'user.html', service_name=SETTING["name"]["service"], login="false",
             user_name=user_data.name, achievement=Markup(User.achievementStrHTML(user_data.id)),
             from_url=from_url if from_url is not None else "/",
             email=user_data.email, user_id=user_data.id, user_key=user_data.key,
@@ -715,7 +717,7 @@ def user():
             if not verified:
                 raise(ValueError())
         except:
-            return render_template(f'user.html', message='ユーザ認証に失敗しました。')
+            return render_template(f'user.html', service_name=SETTING["name"]["service"], message='ユーザ認証に失敗しました。')
         
         new_name = user_data.name
         message = ''
@@ -751,11 +753,13 @@ def user():
 
         except:
             return render_template(f'user.html',
+                                    service_name=SETTING["name"]["service"], 
                                     user_name=user_data.name, message=message, achievement=Markup(User.achievementStrHTML(user_data.id)),
                                     email=user_data.email, user_id=user_data.id, user_key=user_data.key,
                                     my_task_table=Markup(my_task_table_html), submit_table=Markup(submit_table_html))
 
         return render_template(f'user.html',
+                                service_name=SETTING["name"]["service"], 
                                 user_name=new_name, message=message, achievement=Markup(User.achievementStrHTML(user_data.id)),
                                 email=user_data.email, user_id=user_data.id, user_key=user_data.key,
                                 my_task_table=Markup(my_task_table_html), submit_table=Markup(submit_table_html))
@@ -770,7 +774,7 @@ def source(task_id, filename):
 
     file_path = os.path.join(Task.TASKS_DIR, task_id, Task.USER_MODULE_DIR_NAME, filename)
     if not os.path.exists(file_path):
-        return render_template(f'source.html', filename='ファイルが見つかりません')
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='ファイルが見つかりません')
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -781,9 +785,9 @@ def source(task_id, filename):
         filename_head = f"{filename_split[0]}_{filename_split[1]}_{filename_split[2]}_{filename_split[3]}_"
         filename_org = filename.replace(filename_head, '')
     except Exception as e:
-        return render_template(f'source.html', filename='ファイルを読み込めません')
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='ファイルを読み込めません')
 
-    return render_template(f'source.html', source=content, filename=filename_org)
+    return render_template(f'source.html', service_name=SETTING["name"]["service"], source=content, filename=filename_org)
 
 
 @app.route('/verify/<user_id>/<user_key>', methods=['GET'])
@@ -840,6 +844,7 @@ def task(task_id):
 
     return render_template(f'tasks/{task_id}/index.html',
                            menu=menuHTML(Page.TASK, task_id, url_from=f"/{task_id}/task", admin=admin, user_name=user_data.name if verified else ''),
+                           service_name=SETTING["name"]["service"],
                            task_name=task.dispname(SETTING["name"]["contest"]), task_id=task_id,
                            goal=Task.goalText(task.metric, task.goal))
 
@@ -916,6 +921,7 @@ def board(task_id):
                                                          unlock_mode=UnlockMode.UnlockAchieveStats if unlock else UnlockMode.LockAll)
 
     return render_template('board.html',
+                           service_name=SETTING["name"]["service"], 
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_board=Markup(html_table),
                            table_contest_result=Markup(html_contest_result) if html_contest_result is not None else None,
@@ -964,6 +970,7 @@ def log(task_id):
                                             unlock_mode=UnlockMode.UnlockAchieveStats if unlock else UnlockMode.LockAll)
 
     return render_template('log.html',
+                           service_name=SETTING["name"]["service"], 
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_log=Markup(html_table),
                            menu=menuHTML(Page.LOG, task_id, url_from=f"/{task_id}/log", admin=admin, user_name=user_data.name if verified else ''), 
@@ -1031,9 +1038,11 @@ def upload_file(task_id):
     # ユーザ認証
     # verified, user_data, admin = VerifyByCookie(request)
 
-    return render_template('upload.html', task_id=task_id, task_name=task.name, message=msg,
+    return render_template('upload.html',
+                           task_id=task_id, task_name=task.name, message=msg,
                            user_id=user_data.id, user_key=user_data.key,
                            menu=menuHTML(Page.UPLOAD, task_id, url_from=f"/{task_id}/upload", admin=admin, user_name=user_data.name if verified else ''),
+                           service_name=SETTING["name"]["service"],
                            url_from=f"/{task_id}/upload", time_limit=task.timelimit_per_data)
   
 
@@ -1070,6 +1079,7 @@ def admin(task_id):
 
     return render_template('log.html',
                            task_id=task_id,
+                           service_name=SETTING["name"]["service"],
                            task_name=task.dispname(SETTING["name"]["contest"]),
                            table_log=Markup(html_table),
                            menu=menuHTML(Page.ADMIN, task_id, url_from=f"/{task_id}/admin", admin=admin, user_name=user_data.name if verified else ''),
@@ -1115,6 +1125,7 @@ def manage():
             print("Task情報の書き換えに失敗")
    
     return render_template('admin.html',
+                           service_name=SETTING["name"]["service"],
                            user_table=Markup(CreateUserTable()),
                            task_table=Markup(CreateTaskTable(TASK)),
                            log_table=Markup(Log.createTable()))
@@ -1132,4 +1143,4 @@ if __name__ == "__main__":
     TASK = Task.readTasks()
 
     # アプリ開始
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=50000)
