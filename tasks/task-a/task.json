@@ -4,7 +4,7 @@
         "name": "Task A",
         "explanation": "ラベルのない特徴量のアノテーション順序を指定して効率良く性能向上させるTaskです。",
         "start_date": "2024-06-23",
-        "end_date": "2024-07-31",
+        "end_date": "2024-06-29",
         "answer_value_type": "ActiveLearing",
         "metric": "RegistrationRate",
         "input_data_type": "vector",
