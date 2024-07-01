@@ -320,7 +320,7 @@ def caclActiveLearingAccuracy(label_gt, label_estimation, num_class):
     return precision, recall
 
 
-def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, valid_data:list, label_valid:list, registration_order:list, goal:float) -> float:
+def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, valid_data:list, label_valid:list, registration_order:list, goal:float) -> float | list:
     num_registration_per_valid = 5 #5データずつ登録して評価
     num_valid_data = len(registration_order)
     train_data = np.array(train_data)
@@ -328,6 +328,8 @@ def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, vali
     label_train = np.array(label_train)
     label_valid = np.array(label_valid)
     K = 1
+    rr_detail = [] #0%～最大100%登録時点での各クラスのP/R
+    registration_rate = -1
 
     # 評価と登録のループ
     for iValidObject in range(len(registration_order) + 1):
@@ -345,14 +347,19 @@ def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, vali
                 label_estimation = np.zeros((label_valid.shape[0]), int)
 
             precision, recall = caclActiveLearingAccuracy(label_valid, label_estimation, num_class)
-            np.set_printoptions(precision=2)
-            print(f"precision:", precision)
-            print(f"recall:", recall)
 
-            if min(precision) >= goal and min(recall) >= goal:
-                print(f"P/R Goal have been achieved!: {iValidObject} / {num_valid_data}")
+            # 詳細記録
+            if num_valid_data >= 100: #1%ずつ進むことが前提。登録データ100未満に未対応。
+                registration_rate_percent = int((iValidObject / num_valid_data) * 100)
+                if len(rr_detail) < registration_rate_percent + 1: 
+                    rr_detail.append([[],[]])
+                rr_detail[registration_rate_percent][0] = precision
+                rr_detail[registration_rate_percent][1] = recall
+
+            # Goal達成判定
+            if min(precision) >= goal and min(recall) >= goal and registration_rate < 0:
+                print(f"P/R Goal have been achieved! {iValidObject} / {num_valid_data}")
                 registration_rate = iValidObject / num_valid_data
-                break
 
         # trainデータの追加
         if iValidObject < num_valid_data:
@@ -363,9 +370,9 @@ def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, vali
             additional_data = valid_data[addition_index]
             train_data = np.concatenate([train_data, [additional_data]])
             label_train = np.concatenate([label_train, [label_valid[addition_index]]])
-            print(f"{iValidObject}:valid data[{addition_index}] was added.")
+            # print(f"{iValidObject}:valid data[{addition_index}] was added.")
 
-    return registration_rate
+    return registration_rate, rr_detail if len(rr_detail) > 0 else None
 
 
 def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
@@ -421,15 +428,19 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                 abs_errors[result.data_type].append(abs_error)
         elif task.metric == Task.Metric.RegistrationRate:
             registration_rate = {}
+            rr_detail = {}
             for data_type in Task.DataType:
                 registration_rate[data_type] = []
+                rr_detail[data_type] = []
 
             for result in result_list:
                 train_data, label_train, goal = result.parameter
                 num_class = max(label_train) + 1
-                registration_rate[result.data_type].append(
-                    evaluateActiveLearing(num_class, train_data, label_train, result.inputdata, result.correct, result.answer, goal)
-                )
+                rr, detail = evaluateActiveLearing(num_class, train_data, label_train, result.inputdata, result.correct, result.answer, goal)
+
+                registration_rate[result.data_type].append(rr)
+                if detail is not None:
+                    rr_detail[result.data_type].append(detail)
 
         # 評価結果の詳細を出力
         output_csv_filename = user_name + "_" + now.strftime('%Y%m%d_%H%M%S') + ".csv"
@@ -443,7 +454,6 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                 if task.metric == Task.Metric.Accuracy:
                     num_data = num_true[data_type] + num_false[data_type]
                     output_csv_file.write(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}\n")
-                    # print(f"{data_type.name},{num_data},{num_true[data_type]},{num_false[data_type]},{num_true[data_type]/num_data if num_data > 0 else '-'}")
                 elif task.metric == Task.Metric.MAE:
                     if data_type in abs_errors:
                         num_data = len(abs_errors[data_type])
@@ -476,10 +486,37 @@ def ProcOneUser(task_id, user_name, new_filename, now, memo=''):
                 num_data = {}
                 for data_type in Task.DataType:
                     num_data[data_type] = 0
+                # 各出題の成績
                 output_csv_file.write("type,index,RegistrationRate\n")
                 for result in result_list:
                     output_csv_file.write(f"{result.data_type.name},{num_data[result.data_type]},{registration_rate[result.data_type][num_data[result.data_type]]}\n")
                     num_data[result.data_type] += 1
+                # Train/Valid/Testそれぞれの登録率vsP/R
+                for data_type in Task.DataType:
+                    if len(rr_detail[data_type]) > 0:
+                        # 登録率[0..100]に対する平均P/Rを算出
+                        details = np.array(rr_detail[data_type])
+                        mean_pr = np.average(details, axis=0)
+
+                        output_csv_file.write("\n")
+                        output_csv_file.write(f"detail,{data_type.name}\n")
+                        output_csv_file.write("RegistrationRate,")
+                        for iClass in range(mean_pr.shape[2]):
+                            output_csv_file.write(f"precision-{iClass},")
+                        output_csv_file.write("\n")
+                        for iRR in range(mean_pr.shape[0]):
+                            output_csv_file.write(f"{iRR},")
+                            for iClass in range(mean_pr.shape[2]):
+                                output_csv_file.write(f"{mean_pr[iRR, 0, iClass]:.03},")
+                            output_csv_file.write("\n")
+                        for iClass in range(mean_pr.shape[2]):
+                            output_csv_file.write(f"recall-{iClass},")
+                        output_csv_file.write("\n")
+                        for iRR in range(mean_pr.shape[0]):
+                            output_csv_file.write(f"{iRR},")
+                            for iClass in range(mean_pr.shape[2]):
+                                output_csv_file.write(f"{mean_pr[iRR, 1, iClass]:.03},")
+                            output_csv_file.write("\n")
 
     # ユーザ毎の結果出力
     csv_path = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "user", user_name + ".csv")

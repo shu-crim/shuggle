@@ -11,6 +11,9 @@ import glob
 import datetime
 from enum import Enum
 import shutil
+import csv
+import numpy as np
+import matplotlib
 
 from module.task import Task, Stats, Log
 from module.user import User
@@ -258,8 +261,8 @@ def CreateRecordTableRow(submit:Submit, visible_invalid_data:bool=False, user_na
                     return ""
                 
             else:
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train*100:.1f}%(登録率)</td>'
-                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid*100:.1f}%(登録率)</td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.train, submit.task.goal)}>{submit.stats.train*100:.1f}%(登録率) <a href="/detail/{submit.task.id}/{submit.stats.userid}/{submit.stats.datetime.strftime("%Y%m%d_%H%M%S")}/train" class="link-info">●</a></td>'
+                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.valid, submit.task.goal)}>{submit.stats.valid*100:.1f}%(登録率) <a href="/detail/{submit.task.id}/{submit.stats.userid}/{submit.stats.datetime.strftime("%Y%m%d_%H%M%S")}/valid" class="link-info">●</a></td>'
                 
                 # Test:選択
                 if test:
@@ -268,9 +271,9 @@ def CreateRecordTableRow(submit:Submit, visible_invalid_data:bool=False, user_na
                     elif submit.task.type == Task.TaskType.Contest:
                         unlock = False
                         if submit.task.achieve(submit.stats):
-                            # Questであればいつでも、Contestであれば期間終了後にロック解除
+                            # Questであれば存在せず、Contestであれば期間終了後にロック解除
                             if submit.task.afterContest(): 
-                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test*100:.1f}(登録率)</td>'
+                                html_temp += f'<td{EvaluatedValueStyle(submit.task.metric, submit.stats.test, submit.task.goal)}>{submit.stats.test*100:.1f}(登録率) <a href="/detail/{submit.task.id}/{submit.stats.userid}/{submit.stats.datetime.strftime("%Y%m%d_%H%M%S")}/test" class="link-info">●</a></td>'
                                 unlock = True
                         if not unlock:
                             html_temp += f'<td>?</td>'
@@ -430,7 +433,7 @@ def CreateTaskTable(tasks) -> str:
         html_table += f'<td><input type="date" name="end-date" value="{task.end_date.date()}" class="bg-dark text-white"></td>'
         html_table += f"<td>{task.type.name}</td>"
         html_table += f"<td>{task.metric.name}</td>"
-        html_table += f'<td><input type="number" name="goal" value="{task.goal}" step="0.1" class="bg-dark text-white"></td>'
+        html_table += f'<td><input type="number" name="goal" value="{task.goal}" step="{0.01 if task.answer_value_type == Task.AnswerValueType.ActiveLearing else 0.1}" class="bg-dark text-white"></td>'
         html_table += f'<td><input type="number" name="timelimit-per-data" value="{task.timelimit_per_data}" step="0.1" class="bg-dark text-white"></td>'
         html_table += f'<td>&nbsp;&nbsp;&nbsp;<input type="checkbox" name="suspend" class="form-check-input"{" checked" if task.suspend else ""}>&nbsp;&nbsp;&nbsp;</td>'
         html_table += f'<td><input type="submit" value="変更" class="btn btn-outline-info"></td>'
@@ -1129,6 +1132,124 @@ def manage():
                            user_table=Markup(CreateUserTable()),
                            task_table=Markup(CreateTaskTable(TASK)),
                            log_table=Markup(Log.createTable()))
+
+
+@app.route('/detail/<task_id>/<user_id>/<dt>/<data_type>')
+def detail(task_id, user_id, dt, data_type):
+    # ユーザ認証
+    verified, user_data, admin = VerifyByCookie(request)
+    if not verified:
+        return redirect(url_for('login'))
+    
+    # タスク情報を読み込む
+    task:Task = Task(task_id)
+
+    if task.metric != Task.Metric.RegistrationRate:
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='詳細を表示できるTaskではありません')
+    
+    if data_type != "train" and data_type != "valid" and data_type != "test":
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='データタイプの指定が不正です')
+
+    if data_type == "test":
+        if not task.afterContest():
+            return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='まだ表示できません')
+
+    file_path = os.path.join(Task.TASKS_DIR, task_id, Task.OUTPUT_DIR_NAME, "detail", f"{user_id}_{dt}.csv")
+    if not os.path.exists(file_path):
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='詳細を表示するファイルが見つかりません')
+
+    # detal csvの読み込み
+    try:        
+        with open(file_path, 'r', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            all_rows = list(reader)
+            detail = {}
+            iRow = 0
+            stats = {}
+            while iRow < len(all_rows):
+                # 最初のtrain/valid/testがTaskの成績
+                if not "train" in stats and len(all_rows[iRow]) >= 3 and all_rows[iRow][0] == "train":
+                    stats["train"] = float(all_rows[iRow][2])
+                if not "valid" in stats and len(all_rows[iRow]) >= 3 and all_rows[iRow][0] == "valid":
+                    stats["valid"] = float(all_rows[iRow][2])
+                if not "test" in stats and len(all_rows[iRow]) >= 3 and all_rows[iRow][0] == "test":
+                    stats["test"] = float(all_rows[iRow][2])
+
+                # detail記述の始まり
+                if len(all_rows[iRow]) >= 2 and all_rows[iRow][0] == "detail":
+                    kind = all_rows[iRow][1]
+                    detail[kind] = {"precision":[], "recall":[]} #P/RのList
+                    iRow += 1 #ヘッダ行を飛ばす
+                    for iRR in range(101): #0..100%
+                        iRow += 1
+                        while all_rows[iRow] and all_rows[iRow][-1] == '':
+                            all_rows[iRow].pop() #末尾の空白要素を削除
+                        detail[kind]["precision"].append(list(map(float, all_rows[iRow][1:])))
+                    iRow += 1 #ヘッダ行を飛ばす
+                    for iRR in range(101): #0..100%
+                        iRow += 1
+                        while all_rows[iRow] and all_rows[iRow][-1] == '':
+                            all_rows[iRow].pop() #末尾の空白要素を削除
+                        detail[kind]["recall"].append(list(map(float, all_rows[iRow][1:])))
+
+                iRow += 1
+    except Exception as e:
+        print(f"{e}")
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='ファイルを読み込めません')
+    
+    # データが存在しなければ非表示
+    if not data_type in detail:
+        return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='詳細データが存在しません')
+
+    # ゴール達成していなければ非表示
+    if data_type == "test":
+        if stats["train"] > task.goal or stats["valid"] > task.goal or stats["test"] > task.goal:
+            return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='Goalを達成した場合のみ表示可能です')
+    
+    # グラフ表示データ
+    def dataDict(data, precision=True):
+        cmap = matplotlib.colormaps.get_cmap('tab20')
+        data_dict = {
+            "labels": [], "datasets": []
+        }
+        for iRR in range(data.shape[0]):
+            data_dict["labels"].append(f"{iRR}")
+        for iClass in range(data.shape[1]):
+            class_dict = {"label":f"class{iClass}", "data":[], "borderColor":matplotlib.colors.rgb2hex(cmap(iClass))}
+            for iData in range(data.shape[0]):
+                class_dict["data"].append(data[iData][iClass])
+            data_dict["datasets"].append(class_dict)
+        return data_dict
+    
+    def optionsDict(precision=True):
+        config_dict = {"scales":{"x":{},"y":{}}, "elements":{"point":{"radius":0}}}
+        config_dict["scales"]["x"]["beginAtZero"] = True
+        config_dict["scales"]["x"]["title"] = {
+            "display": True,
+            "text": "データ登録率 [%]"
+        }
+        config_dict["scales"]["y"]["beginAtZero"] = True
+        config_dict["scales"]["y"]["title"] = {
+            "display": True,
+            "text": "Precision" if precision else "Recall"
+        }
+        config_dict["scales"]["y"]["grid"] = {
+            "color": "#555"
+        }
+        return config_dict
+
+    precision_data = dataDict(np.array(detail[data_type]["precision"]), precision=True)
+    recall_data = dataDict(np.array(detail[data_type]["recall"]), precision=False)
+
+    return render_template(f'detail_active-learning.html',
+                           service_name=SETTING["name"]["service"],
+                           user_name=User.userIDtoUserName(user_id),
+                           data_type=data_type,
+                           stats=f"{stats[data_type]*100:.01f}",
+                           train_precision=precision_data,
+                           train_recall=recall_data,
+                           options_precision=optionsDict(True),
+                           options_recall=optionsDict(False))
 
 
 if __name__ == "__main__":
