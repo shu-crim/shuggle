@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ service_name }} | {{filename}}</title>
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+        <link href="{{url_for('static', filename='css/shuggle.css')}}" rel="stylesheet">
+    
+        <!-- Chart.jsのCDNを追加 -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <script>
+            Chart.defaults.font.size = 20;
+            Chart.defaults.color = '#AAA';
+            Chart.defaults.plugins.legend.position = 'right';
+            Chart.defaults.plugins.legend.labels.boxHeight = 1;
+        </script>
+
+    </head>
+    <body>
+        <div class="container col-11">
+            <h1><a class="navbar-brand" href="/">IR <span style="color:#00a497">T</span>asks</a></h1>
+        </div>
+
+        <br>
+
+        <div class="container col-11">
+            <h2>{{user_name}} さんの詳細な評価結果</h2>
+        </div>
+
+        <div class="container col-11">
+            <h3>{{data_type}}: 登録率 {{stats}} &percnt;</h3>
+            <h4>Precision</h4>
+            <canvas id="trainPrecisionChart" width="400" height="200"></canvas>
+            <script>
+                var ctx = document.getElementById('trainPrecisionChart').getContext('2d');
+                var trainPrecisionChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {{ train_precision | tojson | safe }},
+                    options: {{ options_precision | tojson | safe }}
+                });
+            </script>
+
+            <h4>Recall</h4>
+            <canvas id="trainRecallChart" width="400" height="200"></canvas>
+            <script>
+                var ctx = document.getElementById('trainRecallChart').getContext('2d');
+                var trainRecallChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {{ train_recall | tojson | safe }},
+                    options: {{ options_recall | tojson | safe }}
+                });
+            </script>
+        </div>
+    
+        <script type="text/javascript" src="{{url_for('static', filename='js/bootstrap.js')}}"></script>
+    </body>
+</html>
