@@ -349,12 +349,13 @@ def evaluateActiveLearing(num_class:int, train_data:list, label_train:list, vali
             precision, recall = caclActiveLearingAccuracy(label_valid, label_estimation, num_class)
 
             # 詳細記録
-            if num_valid_data >= 100: #1%ずつ進むことが前提。登録データ100未満に未対応。
+            if iValidObject == 0:
+                rr_detail.append([precision, recall])
+            else:
                 registration_rate_percent = int((iValidObject / num_valid_data) * 100)
-                if len(rr_detail) < registration_rate_percent + 1: 
-                    rr_detail.append([[],[]])
-                rr_detail[registration_rate_percent][0] = precision
-                rr_detail[registration_rate_percent][1] = recall
+                while len(rr_detail) < registration_rate_percent + 1:
+                    rr_detail.append(rr_detail[-1]) #最後に登録された結果をコピーする
+                rr_detail[registration_rate_percent] = [precision, recall]
 
             # Goal達成判定
             if min(precision) >= goal and min(recall) >= goal and registration_rate < 0:

@@ -14,6 +14,7 @@ import shutil
 import csv
 import numpy as np
 import matplotlib
+import matplotlib.pyplot as plt
 
 from module.task import Task, Stats, Log
 from module.user import User
@@ -1208,7 +1209,7 @@ def detail(task_id, user_id, dt, data_type):
     
     # グラフ表示データ
     def dataDict(data, precision=True):
-        cmap = matplotlib.colormaps.get_cmap('tab20')
+        cmap = plt.get_cmap('tab20')
         data_dict = {
             "labels": [], "datasets": []
         }
