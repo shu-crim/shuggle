@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 from module.task import Task, Stats, Log
 from module.user import User
 
+from tasks_system import FILENAME_DATASET_JSON
+
 
 ALLOWED_EXTENSIONS = set(['py'])
 TASK = {}
@@ -1159,6 +1161,16 @@ def detail(task_id, user_id, dt, data_type):
     if not os.path.exists(file_path):
         return render_template(f'source.html', service_name=SETTING["name"]["service"], filename='詳細を表示するファイルが見つかりません')
 
+    class_name = {}
+    try:
+        dataset_path = os.path.join(Task.TASKS_DIR, task_id, data_type, FILENAME_DATASET_JSON)
+        with open(dataset_path, 'r', encoding='utf-8') as f:
+            dataset = json.load(f)
+        for key, value in dataset["settings"]["class_name"].items():
+            class_name[int(key)] = value
+    except Exception as e:
+        print(e)
+
     # detal csvの読み込み
     try:        
         with open(file_path, 'r', encoding='utf-8') as csvfile:
@@ -1216,7 +1228,7 @@ def detail(task_id, user_id, dt, data_type):
         for iRR in range(data.shape[0]):
             data_dict["labels"].append(f"{iRR}")
         for iClass in range(data.shape[1]):
-            class_dict = {"label":f"class{iClass}", "data":[], "borderColor":matplotlib.colors.rgb2hex(cmap(iClass))}
+            class_dict = {"label":class_name[iClass] if iClass in class_name else f"class{iClass}", "data":[], "borderColor":matplotlib.colors.rgb2hex(cmap(iClass))}
             for iData in range(data.shape[0]):
                 class_dict["data"].append(data[iData][iClass])
             data_dict["datasets"].append(class_dict)
